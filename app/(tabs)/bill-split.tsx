@@ -60,7 +60,7 @@ export default function BillSplittingScreen() {
 
         if (!savedGroupName) {
           console.log("No group found in AsyncStorage");
-          navigation.navigate("GroupCreation"); // Redirect if no group exists
+          navigation.navigate("GroupCreation");
           return;
         }
 
@@ -78,7 +78,7 @@ export default function BillSplittingScreen() {
             { name: data.member1, email: data.member1_email },
             { name: data.member2, email: data.member2_email },
             { name: data.member3, email: data.member3_email },
-          ].filter((member) => member.name); // Filter out empty members
+          ].filter((member) => member.name);
 
           setParticipants(
             groupMembers.map((member) => ({
@@ -180,7 +180,7 @@ export default function BillSplittingScreen() {
   const sendBillToParticipants = async () => {
     const emailAddresses = participants.map((p) => p.email).join(", ");
     const participantDetails = participants
-      .map((p) => `${p.name}: $${p.items[0].amount.toFixed(2)}`)
+      .map((p) => `₹{p.name}: ₹₹{p.items[0].amount.toFixed(2)}`)
       .join("\n");
 
     const emailData = {
@@ -191,12 +191,12 @@ export default function BillSplittingScreen() {
 
     const messageBody = `
       Bill Splitting Test
-      Group: ${emailData.groupName || "No Group Name"}
-      Total Bill: $${emailData.totalBill}
+      Group: ₹{emailData.groupName || "No Group Name"}
+      Total Bill: ₹₹{emailData.totalBill}
       Participants:
-      ${emailData.participants}
+      ₹{emailData.participants}
       This is a test email to verify functionality.
-      Email recipients: ${emailAddresses}
+      Email recipients: ₹{emailAddresses}
     `;
 
     try {
@@ -318,7 +318,9 @@ export default function BillSplittingScreen() {
           data={participants}
           renderItem={renderParticipant}
           keyExtractor={(_, index) => index.toString()}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator={true}
+          style={styles.flatList}
+          nestedScrollEnabled={true}
         />
 
         <View style={styles.actions}>
@@ -326,7 +328,7 @@ export default function BillSplittingScreen() {
             <Icon name="plus" size={20} color="#fff" />
             <Text style={styles.addButtonText}>Add Participant</Text>
           </TouchableOpacity>
-          <Text style={styles.totalText}>Total Bill: ${totalBill.toFixed(2)}</Text>
+          <Text style={styles.totalText}>Total Bill: ₹{totalBill.toFixed(2)}</Text>
         </View>
 
         <TouchableOpacity onPress={sendBillToParticipants} style={styles.sendButton}>
@@ -342,7 +344,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 16,
     backgroundColor: "#f5f5f5",
-    paddingTop: 0, // Equivalent to mt-[80px]
+    paddingTop: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -354,7 +356,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   groupDetails: {
-    backgroundColor: "#eff6ff", // blue-50
+    backgroundColor: "#eff6ff",
     padding: 16,
     borderRadius: 8,
     marginBottom: 24,
@@ -391,6 +393,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   billContainer: {
+    flex: 1,
     backgroundColor: "#ffffff",
     padding: 16,
     borderRadius: 8,
@@ -413,6 +416,10 @@ const styles = StyleSheet.create({
     padding: 8,
     fontSize: 16,
     marginBottom: 16,
+  },
+  flatList: {
+    flexGrow: 1,
+    maxHeight: '60%', // Optional: adjust or remove based on your needs
   },
   participantContainer: {
     borderBottomWidth: 1,
@@ -453,7 +460,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flexDirection: "row",
-    backgroundColor: "#22c55e", // green-500
+    backgroundColor: "#22c55e",
     padding: 10,
     borderRadius: 4,
     alignItems: "center",
@@ -469,7 +476,7 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
   sendButton: {
-    backgroundColor: "#3b82f6", // blue-500
+    backgroundColor: "#3b82f6",
     padding: 12,
     borderRadius: 4,
     alignItems: "center",

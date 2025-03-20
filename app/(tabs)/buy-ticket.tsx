@@ -38,7 +38,7 @@ export default function TicketScreen() {
               <Text style={styles.eventTitle}>{event.title}</Text>
               <Text style={styles.eventDate}>{event.date}</Text>
               <View style={styles.eventFooter}>
-                <Text style={styles.eventPrice}>${event.price}</Text>
+                <Text style={styles.eventPrice}>₹{event.price}</Text>
                 <View style={styles.bookButton}>
                   <Text style={styles.bookButtonText}>Book Now</Text>
                 </View>

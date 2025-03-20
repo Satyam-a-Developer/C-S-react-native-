@@ -28,7 +28,7 @@ export default function App() {
 
         const combinedData = usersData.map((user: any) => ({
           ...user,
-          avatar: `https://randomuser.me/api/portraits/men/${user.id}.jpg`,
+          avatar: `https://randomuser.me/api/portraits/men/₹{user.id}.jpg`,
           posts: postsData.filter((post: Post) => post.userId === user.id).slice(0, 2),
         })) as User[];
 

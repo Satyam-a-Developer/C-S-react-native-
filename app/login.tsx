@@ -97,16 +97,16 @@ const GroupCreationForm: React.FC = () => {
               <Text style={styles.label}>Member {memberNum}</Text>
               <TextInput
                 style={styles.input}
-                value={groupData[`member${memberNum}Name` as keyof GroupData]}
-                onChangeText={(text) => handleChange(`member${memberNum}Name` as keyof GroupData, text)}
-                placeholder={`Member ${memberNum} Name`}
+                value={groupData[`member₹{memberNum}Name` as keyof GroupData]}
+                onChangeText={(text) => handleChange(`member₹{memberNum}Name` as keyof GroupData, text)}
+                placeholder={`Member ₹{memberNum} Name`}
                 autoCapitalize="words"
               />
               <TextInput
                 style={styles.input}
-                value={groupData[`member${memberNum}Email` as keyof GroupData]}
-                onChangeText={(text) => handleChange(`member${memberNum}Email` as keyof GroupData, text)}
-                placeholder={`Member ${memberNum} Email`}
+                value={groupData[`member₹{memberNum}Email` as keyof GroupData]}
+                onChangeText={(text) => handleChange(`member₹{memberNum}Email` as keyof GroupData, text)}
+                placeholder={`Member ₹{memberNum} Email`}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
