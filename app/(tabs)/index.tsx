@@ -1,140 +1,265 @@
-import { View, StyleSheet, ScrollView, Text } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { createClient } from '@supabase/supabase-js';
+import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// Initialize Supabase client (replace with your actual credentials)
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY );
+
+interface Member {
+  name: string;
+  email?: string;
+}
 
 export default function HomeScreen() {
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.statusSection}>
-        <Text style={styles.statusTitle}>System Status</Text>
-        {[
-          { name: 'Payment Gateway', status: 'Operational', color: '#34C759' },
-          { name: 'User Authentication', status: 'Operational', color: '#34C759' },
-          { name: 'Media Services', status: 'Partial Outage', color: '#FF9500' },
-          { name: 'Ticket System', status: 'Operational', color: '#34C759' },
-          { name: 'Database', status: 'Operational', color: '#34C759' },
-        ].map((service, index) => (
-          <View key={index} style={styles.statusCard}>
-            <View style={styles.statusHeader}>
-              <Text style={styles.serviceName}>{service.name}</Text>
-              <View style={[styles.statusIndicator, { backgroundColor: service.color }]} />
-            </View>
-            <Text style={[styles.statusText, { color: service.color }]}>{service.status}</Text>
-            <View style={styles.metrics}>
-              <Text style={styles.metricText}>Uptime: 99.9%</Text>
-              <Text style={styles.metricText}>Response: 120ms</Text>
-            </View>
-          </View>
-        ))}
+  const [groupName, setGroupName] = useState<string>('');
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
-        {/* Incident History */}
-        <View style={styles.incidentSection}>
-          <Text style={styles.incidentTitle}>Recent Incidents</Text>
-          {[
-            { date: '2024-02-10', title: 'Minor API Latency', status: 'Resolved' },
-            { date: '2024-02-08', title: 'Database Maintenance', status: 'Resolved' },
-          ].map((incident, index) => (
-            <View key={index} style={styles.incidentCard}>
-              <Text style={styles.incidentDate}>{incident.date}</Text>
-              <Text style={styles.incidentName}>{incident.title}</Text>
-              <Text style={styles.incidentStatus}>{incident.status}</Text>
-            </View>
-          ))}
+  useEffect(() => {
+    const fetchLatestGroup = async () => {
+      setLoading(true);
+      try {
+        const savedGroupName = await AsyncStorage.getItem('groupData');
+        if (!savedGroupName) {
+          setGroupName('Unnamed Group');
+          setMembers([]);
+          console.log('No group data found in AsyncStorage');
+          return;
+        }
+
+        const parsedGroupName = JSON.parse(savedGroupName);
+        setGroupName(parsedGroupName);
+
+        const { data, error } = await supabase
+          .from('groups')
+          .select('name, member1, member1_email, member2, member2_email, member3, member3_email')
+          .eq('name', parsedGroupName)
+          .single();
+
+        if (error) throw new Error(`Supabase fetch error: ${error.message}`);
+
+        if (data) {
+          const groupMembers = [
+            { name: data.member1, email: data.member1_email },
+            { name: data.member2, email: data.member2_email },
+            { name: data.member3, email: data.member3_email },
+          ].filter((member) => member.name);
+
+          setMembers(groupMembers);
+        } else {
+          setMembers([]);
+          console.log('No group data returned from Supabase');
+        }
+      } catch (error) {
+        console.error('Error fetching group details:', error);
+        setGroupName('Error Loading Group');
+        setMembers([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLatestGroup();
+  }, []);
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <Text style={styles.heroTitle}>
+            {groupName ? `${groupName}'s Community` : 'Connect. Collaborate. Share.'}
+          </Text>
+          <Text style={styles.heroSubtitle}>
+            The seamless platform for teams to work together, anywhere.
+          </Text>
+          <TouchableOpacity style={styles.ctaButton}>
+            <Text style={styles.ctaButtonText}>Get Started</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-    </ScrollView>
+
+        {/* Members Section */}
+        <View style={styles.membersSection}>
+          <Text style={styles.sectionTitle}>Group Members</Text>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading members...</Text>
+          ) : members.length > 0 ? (
+            members.map((member, index) => (
+              <View key={index} style={styles.memberCard}>
+                <Text style={styles.memberName}>{member.name}</Text>
+                {member.email && (
+                  <Text style={styles.memberEmail}>{member.email}</Text>
+                )}
+              </View>
+            ))
+          ) : (
+            <Text style={styles.noMembersText}>No members found</Text>
+          )}
+        </View>
+
+        {/* System Status Section */}
+        <View style={styles.statusSection}>
+          <Text style={styles.sectionTitle}>System Status</Text>
+          <TouchableOpacity style={styles.statusButton}>
+            <View style={styles.statusIndicator} />
+            <Text style={styles.statusButtonText}>All Systems Operational</Text>
+            <Text style={styles.viewDetailsText}>View Details →</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Call To Action */}
+        <View style={styles.ctaSection}>
+          <Text style={styles.ctaTitle}>Ready to transform your team's workflow?</Text>
+          <TouchableOpacity style={styles.ctaButtonLarge}>
+            <Text style={styles.ctaButtonText}>Start Your Free Trial</Text>
+          </TouchableOpacity>
+          <Text style={styles.ctaSubtext}>No credit card required.</Text>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: '#FFFFFF',
   },
-  statusSection: {
-    padding: 20,
+  heroSection: {
+    padding: 25,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFF',
   },
-  statusTitle: {
-    fontSize: 28,
+  heroTitle: {
+    fontSize: 32,
     fontWeight: 'bold',
-    color: '#000000',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: 15,
+  },
+  heroSubtitle: {
+    fontSize: 18,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 25,
+    lineHeight: 26,
+  },
+  ctaButton: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 14,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+    marginTop: 10,
+  },
+  ctaButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  membersSection: {
+    padding: 25,
+    backgroundColor: '#FFFFFF',
+  },
+  sectionTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1E293B',
     marginBottom: 20,
   },
-  statusCard: {
+  memberCard: {
+    backgroundColor: '#F8FAFF',
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  memberName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1E293B',
+  },
+  memberEmail: {
+    fontSize: 14,
+    color: '#64748B',
+    marginTop: 5,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  noMembersText: {
+    fontSize: 16,
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  statusSection: {
+    padding: 25,
+    backgroundColor: '#F8FAFF',
+  },
+  statusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 20,
-    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  statusHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  serviceName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#000000',
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
+    elevation: 2,
   },
   statusIndicator: {
     width: 12,
     height: 12,
     borderRadius: 6,
+    backgroundColor: '#34C759',
+    marginRight: 10,
   },
-  statusText: {
+  statusButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 15,
+    fontWeight: '600',
+    color: '#1E293B',
+    flex: 1,
   },
-  metrics: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: '#F8F9FA',
-    padding: 10,
-    borderRadius: 8,
-  },
-  metricText: {
+  viewDetailsText: {
     fontSize: 14,
-    color: '#6C757D',
+    color: '#2563EB',
+    fontWeight: '500',
   },
-  incidentSection: {
-    marginTop: 30,
-  },
-  incidentTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#000000',
-    marginBottom: 15,
-  },
-  incidentCard: {
-    backgroundColor: '#FFFFFF',
+  ctaSection: {
+    padding: 30,
+    backgroundColor: '#F0F4FF',
+    alignItems: 'center',
     borderRadius: 12,
-    padding: 15,
+    margin: 25,
+  },
+  ctaTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#1E293B',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  ctaButtonLarge: {
+    backgroundColor: '#2563EB',
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    borderRadius: 25,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  incidentDate: {
+  ctaSubtext: {
     fontSize: 14,
-    color: '#6C757D',
-    marginBottom: 5,
-  },
-  incidentName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000000',
-    marginBottom: 5,
-  },
-  incidentStatus: {
-    fontSize: 14,
-    color: '#34C759',
-    fontWeight: '500',
+    color: '#64748B',
   },
 });

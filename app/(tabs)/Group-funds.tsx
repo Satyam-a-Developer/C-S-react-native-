@@ -12,62 +12,63 @@ import {
   StatusBar,
   Image,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-native-qrcode-svg';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Animatable from 'react-native-animatable';
 
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
+const { width } = Dimensions.get('window'); 
 
 const MicroinvestmentScreen: React.FC = () => {
   const [groupName, setGroupName] = useState<string>('');
-  const [members, setMembers] = useState<{ name: string; savings: number; avatar?: string }[]>([]);
+  const [members, setMembers] = useState<{ name: string; savings: number }[]>([]);
   const [totalSavings, setTotalSavings] = useState<number>(0);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'savings' | 'trips'>('savings');
 
-  // Mock data for group trips
+  // Updated groupTrips with free Unsplash splash image URLs
   const groupTrips = [
     { 
       destination: 'Goa Beach', 
       cost: 5000, 
       duration: '3 days', 
-      image: 'https://via.placeholder.com/80',
+      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=90&h=90&q=80', 
       progress: 65 
     },
     { 
       destination: 'Manali Hills', 
       cost: 7000, 
       duration: '5 days', 
-      image: 'https://via.placeholder.com/80',
-      progress: 42
+      image: 'https://plus.unsplash.com/premium_photo-1726313836345-3524772937fe?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', 
+      progress: 42 
     },
     { 
       destination: 'Rajasthan Safari', 
       cost: 6000, 
       duration: '4 days', 
-      image: 'https://via.placeholder.com/80',
-      progress: 28
+      image: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?ixlib=rb-4.0.3&auto=format&fit=crop&w=90&h=90&q=80', 
+      progress: 28 
     },
   ];
 
-  // Fetch group data from Supabase using AsyncStorage
   useEffect(() => {
     const fetchLatestGroup = async () => {
+      setLoading(true);
       try {
-        setLoading(true);
-        // Retrieve group name from AsyncStorage
         const savedGroupName = await AsyncStorage.getItem('groupData');
         if (!savedGroupName) {
-          console.log('No group found in AsyncStorage');
-          setGroupName('Default Group'); // Fallback name
-          setLoading(false);
+          setGroupName('Unnamed Group');
+          setMembers([]);
+          console.log('No group data found in AsyncStorage');
           return;
         }
 
@@ -76,27 +77,30 @@ const MicroinvestmentScreen: React.FC = () => {
 
         const { data, error } = await supabase
           .from('groups')
-          .select('*')
+          .select('name, member1, member1_email, member2, member2_email, member3, member3_email')
           .eq('name', parsedGroupName)
           .single();
 
-        if (error) throw error;
+        if (error) throw new Error(`Supabase fetch error: ${error.message}`);
 
         if (data) {
-          // Adding mock savings and avatar data for demonstration
           const groupMembers = [
-            { name: data.member1, email: data.member1_email, savings: 1250, avatar: 'https://via.placeholder.com/50' },
-            { name: data.member2, email: data.member2_email, savings: 980, avatar: 'https://via.placeholder.com/50' },
-            { name: data.member3, email: data.member3_email, savings: 650, avatar: 'https://via.placeholder.com/50' },
+            { name: data.member1, email: data.member1_email, savings: 1250 },
+            { name: data.member2, email: data.member2_email, savings: 980 },
+            { name: data.member3, email: data.member3_email, savings: 650 },
           ].filter((member) => member.name);
 
           setMembers(groupMembers);
-          const total = groupMembers.reduce((sum, member) => sum + member.savings, 0);
-          setTotalSavings(total);
+          setTotalSavings(groupMembers.reduce((sum, member) => sum + member.savings, 0));
+        } else {
+          setMembers([]);
+          console.log('No group data returned from Supabase');
         }
       } catch (error) {
         console.error('Error fetching group details:', error);
-        Alert.alert('Error', 'Failed to load group data');
+        Alert.alert('Error', 'Unable to load group data.');
+        setGroupName('Error Loading Group');
+        setMembers([]);
       } finally {
         setLoading(false);
       }
@@ -105,226 +109,224 @@ const MicroinvestmentScreen: React.FC = () => {
     fetchLatestGroup();
   }, []);
 
-  // Render member item
-  const renderMember = ({ item }: { item: { name: string; savings: number; avatar?: string } }) => (
-    <TouchableOpacity
-      style={styles.memberCard}
-      onPress={() => setSelectedMember(item.name)}
-    >
-      <View style={styles.memberAvatarContainer}>
-        {item.avatar ? (
-          <Image source={{ uri: item.avatar }} style={styles.memberAvatar} />
-        ) : (
-          <View style={styles.memberAvatarPlaceholder}>
-            <Text style={styles.memberInitial}>{item.name.charAt(0)}</Text>
-          </View>
-        )}
-      </View>
-      <Text style={styles.memberName}>{item.name}</Text>
-      <Text style={styles.memberSavings}>₹{item.savings.toLocaleString()}</Text>
-    </TouchableOpacity>
+  const renderMember = ({ item }: { item: { name: string; savings: number } }) => (
+    <Animatable.View animation="fadeIn" style={styles.memberCard}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => setSelectedMember(item.name)}
+      >
+        <View style={styles.memberIconContainer}>
+          <Icon name="person" size={40} color="#2563eb" />
+        </View>
+        <Text style={styles.memberName}>{item.name}</Text>
+        <Text style={styles.memberSavings}>₹{item.savings.toLocaleString()}</Text>
+      </TouchableOpacity>
+    </Animatable.View>
   );
 
-  // Render trip item
   const renderTrip = ({ item }: { item: { destination: string; cost: number; duration: string; image: string; progress: number } }) => (
-    <TouchableOpacity style={styles.tripItem}>
-      <Image source={{ uri: item.image }} style={styles.tripImage} />
+    <Animatable.View animation="fadeInUp" style={styles.tripItem}>
+      <Image 
+        source={{ uri: item.image }} 
+        style={styles.tripImage} 
+        defaultSource={{ uri: 'https://via.placeholder.com/90' }} // Fallback image
+        onError={(e) => console.log(`Failed to load image for ${item.destination}: ${e.nativeEvent.error}`)}
+      />
       <View style={styles.tripInfo}>
         <Text style={styles.tripDestination}>{item.destination}</Text>
         <Text style={styles.tripDuration}>{item.duration}</Text>
         <View style={styles.progressBar}>
-          <View style={[styles.progressFill, { width: `₹{item.progress}%` }]} />
+          <Animatable.View
+            animation="slideInLeft"
+            duration={1000}
+            style={[styles.progressFill, { width: `${item.progress}%` }]}
+          />
         </View>
         <View style={styles.tripProgress}>
-          <Text style={styles.progressText}>{item.progress}% funded</Text>
+          <Text style={styles.progressText}>{item.progress}% Funded</Text>
           <Text style={styles.tripCost}>₹{item.cost.toLocaleString()}</Text>
         </View>
       </View>
-    </TouchableOpacity>
+    </Animatable.View>
   );
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2563eb" />
-        <Text style={styles.loadingText}>Loading group data...</Text>
-      </View>
+        <Text style={styles.loadingText}>Loading your group...</Text>
+      </SafeAreaView>
     );
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#f0f9ff" />
+      <StatusBar barStyle="light-content" backgroundColor="#2563eb" />
       <ScrollView contentContainerStyle={styles.container}>
         {/* Header */}
-        <LinearGradient
-          colors={['#3b82f6', '#2563eb']}
-          style={styles.headerGradient}
-        >
+        <LinearGradient colors={['#3b82f6', '#1e40af']} style={styles.headerGradient}>
           <View style={styles.header}>
-            <Icon name="group" size={32} color="#fff" />
-            <Text style={styles.title}>
-              {groupName ? `₹{groupName}'s Fund` : 'Group Fund'}
-            </Text>
+            <Icon name="people" size={34} color="#fff" />
+            <Text style={styles.title}>{groupName ? `${groupName}'s Fund` : 'Group Fund'}</Text>
           </View>
-          <View style={styles.savingsContainer}>
-            <Text style={styles.savingsLabel}>Total Group Savings</Text>
-            <Text style={styles.totalSavings}>₹{totalSavings.toLocaleString()}</Text>
-          </View>
+          <Text style={styles.savingsLabel}>Total Group Savings</Text>
+          <Text style={styles.totalSavings}>₹{totalSavings.toLocaleString()}</Text>
         </LinearGradient>
 
-        {/* Tab Navigation */}
+        {/* Tabs */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'savings' && styles.activeTab]}
             onPress={() => setActiveTab('savings')}
+            activeOpacity={0.7}
           >
-            <Icon 
-              name="account-balance-wallet" 
-              size={22} 
-              color={activeTab === 'savings' ? '#2563eb' : '#64748b'} 
+            <Icon
+              name="wallet-outline"
+              size={24}
+              color={activeTab === 'savings' ? '#2563eb' : '#94a3b8'}
             />
-            <Text style={[styles.tabText, activeTab === 'savings' && styles.activeTabText]}>Savings</Text>
+            <Text style={[styles.tabText, activeTab === 'savings' && styles.activeTabText]}>
+              Savings
+            </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.tab, activeTab === 'trips' && styles.activeTab]}
             onPress={() => setActiveTab('trips')}
+            activeOpacity={0.7}
           >
-            <Icon 
-              name="flight" 
-              size={22} 
-              color={activeTab === 'trips' ? '#2563eb' : '#64748b'} 
+            <Icon
+              name="airplane-outline"
+              size={24}
+              color={activeTab === 'trips' ? '#2563eb' : '#94a3b8'}
             />
-            <Text style={[styles.tabText, activeTab === 'trips' && styles.activeTabText]}>Trip Plans</Text>
+            <Text style={[styles.tabText, activeTab === 'trips' && styles.activeTabText]}>
+              Trips
+            </Text>
           </TouchableOpacity>
         </View>
 
-        {/* Members Tab */}
+        {/* Savings Tab */}
         {activeTab === 'savings' && (
-          <>
+          <Animatable.View animation="fadeIn" style={styles.tabContent}>
             <Text style={styles.sectionTitle}>Group Members</Text>
-            <Text style={styles.subtitle}>
-              Tap a member to view their QR code for investments
-            </Text>
-
+            <Text style={styles.subtitle}>Tap a member to invest via QR</Text>
             <FlatList
               data={members}
               renderItem={renderMember}
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item) => item.name}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.membersListContainer}
             />
-
-            {/* Invest Button */}
-            <TouchableOpacity style={styles.primaryButton} onPress={() => setShowQrModal(true)}>
-              <Icon name="add-circle-outline" size={20} color="#fff" />
-              <Text style={styles.buttonText}>Add Investment</Text>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => setShowQrModal(true)}
+              activeOpacity={0.8}
+            >
+              <Icon name="add-outline" size={22} color="#fff" />
+              <Text style={styles.buttonText}>Invest Now</Text>
             </TouchableOpacity>
-
-            {/* Alternative Payment Method */}
             <TouchableOpacity
               style={styles.secondaryButton}
-              onPress={() => Alert.alert('Stripe', 'Stripe payment processing will be integrated here')}
+              onPress={() => Alert.alert('Payment', 'Card payment coming soon!')}
+              activeOpacity={0.8}
             >
-              <Icon name="credit-card" size={20} color="#2563eb" />
+              <Icon name="card-outline" size={22} color="#2563eb" />
               <Text style={styles.secondaryButtonText}>Pay with Card</Text>
             </TouchableOpacity>
-          </>
+          </Animatable.View>
         )}
 
         {/* Trips Tab */}
         {activeTab === 'trips' && (
-          <>
+          <Animatable.View animation="fadeIn" style={styles.tabContent}>
             <View style={styles.tripHeaderRow}>
-              <Text style={styles.sectionTitle}>Upcoming Trips</Text>
-              <TouchableOpacity>
+              <Text style={styles.sectionTitle}>Trip Plans</Text>
+              <TouchableOpacity activeOpacity={0.7}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
             </View>
             <FlatList
               data={groupTrips}
               renderItem={renderTrip}
-              keyExtractor={(item, index) => index.toString()}
+              keyExtractor={(item) => item.destination}
               scrollEnabled={false}
             />
-            
-            <TouchableOpacity style={styles.primaryButton}>
-              <Icon name="add-circle-outline" size={20} color="#fff" />
-              <Text style={styles.buttonText}>Plan New Trip</Text>
+            <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8}>
+              <Icon name="add-outline" size={22} color="#fff" />
+              <Text style={styles.buttonText}>Plan a Trip</Text>
             </TouchableOpacity>
-          </>
+          </Animatable.View>
         )}
       </ScrollView>
 
       {/* QR Code Modal */}
       <Modal visible={showQrModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <Animatable.View animation="zoomIn" style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Invest in Group Fund</Text>
-              <TouchableOpacity onPress={() => setShowQrModal(false)}>
-                <Icon name="close" size={24} color="#64748b" />
+              <Text style={styles.modalTitle}>Group Investment</Text>
+              <TouchableOpacity onPress={() => setShowQrModal(false)} activeOpacity={0.7}>
+                <Icon name="close" size={26} color="#64748b" />
               </TouchableOpacity>
             </View>
             <QRCode value="GroupPaymentLink" size={200} backgroundColor="#FFF" color="#1e40af" />
-            <Text style={styles.modalSubtitle}>Scan with any UPI app to contribute</Text>
-            <TouchableOpacity style={styles.primaryButton} onPress={() => setShowQrModal(false)}>
+            <Text style={styles.modalSubtitle}>Scan with any UPI app</Text>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => setShowQrModal(false)}
+              activeOpacity={0.8}
+            >
               <Text style={styles.buttonText}>Done</Text>
             </TouchableOpacity>
-          </View>
+          </Animatable.View>
         </View>
       </Modal>
 
-      {/* Selected Member QR */}
+      {/* Member QR Modal */}
       <Modal visible={!!selectedMember} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+          <Animatable.View animation="slideInUp" style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                <Icon name="person" size={22} color="#2563eb" /> {selectedMember}
-              </Text>
-              <TouchableOpacity onPress={() => setSelectedMember(null)}>
-                <Icon name="close" size={24} color="#64748b" />
+              <View style={styles.modalTitleContainer}>
+                <Icon name="person-outline" size={24} color="#2563eb" />
+                <Text style={styles.modalTitle}>{selectedMember}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setSelectedMember(null)} activeOpacity={0.7}>
+                <Icon name="close" size={26} color="#64748b" />
               </TouchableOpacity>
             </View>
-            
             <View style={styles.memberQrContainer}>
-              <QRCode 
-                value={`Member:₹{selectedMember}`} 
-                size={180} 
-                backgroundColor="#FFF" 
-                color="#1e40af"
-              />
+              <QRCode value={`Member:${selectedMember}`} size={180} backgroundColor="#FFF" color="#1e40af" />
             </View>
-            
             <View style={styles.memberDetails}>
               <View style={styles.detailRow}>
-                <Text style={styles.detailLabel}>Current Savings</Text>
+                <Text style={styles.detailLabel}>Savings</Text>
                 <Text style={styles.detailValue}>
-                  ₹{members.find(m => m.name === selectedMember)?.savings.toLocaleString()}
+                  ₹{members.find((m) => m.name === selectedMember)?.savings.toLocaleString()}
                 </Text>
               </View>
               <View style={styles.detailRow}>
                 <Text style={styles.detailLabel}>Contribution</Text>
                 <Text style={styles.detailValue}>
-                  {((members.find(m => m.name === selectedMember)?.savings || 0) / totalSavings * 100).toFixed(1)}%
+                  {((members.find((m) => m.name === selectedMember)?.savings || 0) / totalSavings * 100).toFixed(1)}%
                 </Text>
               </View>
             </View>
-            
-            <TouchableOpacity style={styles.primaryButton} onPress={() => setSelectedMember(null)}>
+            <TouchableOpacity
+              style={styles.primaryButton}
+              onPress={() => setSelectedMember(null)}
+              activeOpacity={0.8}
+            >
               <Text style={styles.buttonText}>Close</Text>
             </TouchableOpacity>
-          </View>
+          </Animatable.View>
         </View>
       </Modal>
     </SafeAreaView>
   );
 };
 
-// Updated styles
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
@@ -337,135 +339,126 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
+    marginTop: 16,
+    fontSize: 18,
     color: '#64748b',
+    fontWeight: '500',
   },
   container: {
     flexGrow: 1,
     backgroundColor: '#f8fafc',
+    paddingBottom: 20,
   },
   headerGradient: {
-    paddingTop: 40,
-    paddingBottom: 30,
-    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 40,
+    paddingHorizontal: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   title: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 28,
+    fontWeight: '700',
     color: '#fff',
-    marginLeft: 8,
-  },
-  savingsContainer: {
-    marginTop: 16,
+    marginLeft: 12,
   },
   savingsLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#dbeafe',
+    marginTop: 12,
+    fontWeight: '500',
   },
   totalSavings: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: 42,
+    fontWeight: '800',
     color: '#fff',
+    marginTop: 4,
   },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    borderRadius: 12,
-    marginHorizontal: 16,
-    marginTop: -20,
-    elevation: 6,
+    borderRadius: 16,
+    marginHorizontal: 20,
+    marginTop: -25,
+    padding: 4,
+    elevation: 10,
     shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
   },
   tab: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 12,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 12,
   },
   activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#2563eb',
+    backgroundColor: '#dbeafe',
   },
   tabText: {
-    marginLeft: 6,
-    fontSize: 14,
+    marginLeft: 8,
+    fontSize: 16,
     fontWeight: '600',
-    color: '#64748b',
+    color: '#94a3b8',
   },
   activeTabText: {
     color: '#2563eb',
   },
+  tabContent: {
+    paddingHorizontal: 20,
+  },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: '700',
     color: '#1e293b',
     marginTop: 24,
-    marginLeft: 16,
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     color: '#64748b',
-    marginTop: 4,
-    marginLeft: 16,
+    marginBottom: 16,
   },
   membersListContainer: {
-    paddingHorizontal: 10,
-    marginTop: 16,
+    paddingVertical: 8,
   },
   memberCard: {
     backgroundColor: '#fff',
-    padding: 16,
-    borderRadius: 16,
+    padding: 14,
+    borderRadius: 20,
     alignItems: 'center',
-    marginHorizontal: 6,
-    width: 110,
+    marginHorizontal: 8,
+    width: width * 0.32, // Responsive width
+    elevation: 4,
     shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
   },
-  memberAvatarContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  memberAvatar: {
-    width: 56,
-    height: 56,
-  },
-  memberAvatarPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#e2e8f0',
+  memberIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#dbeafe',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  memberInitial: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#64748b',
-  },
   memberName: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1e293b',
     textAlign: 'center',
+    marginTop: 8,
   },
   memberSavings: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#2563eb',
     marginTop: 4,
@@ -473,170 +466,179 @@ const styles = StyleSheet.create({
   primaryButton: {
     flexDirection: 'row',
     backgroundColor: '#2563eb',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 14,
     marginTop: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 6,
+    shadowColor: '#2563eb',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   buttonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: 10,
   },
   secondaryButton: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    marginHorizontal: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 14,
     marginTop: 12,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderWidth: 2,
+    borderColor: '#2563eb',
+    elevation: 4,
   },
   secondaryButtonText: {
     color: '#2563eb',
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '600',
-    marginLeft: 6,
+    marginLeft: 10,
   },
   tripHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingRight: 16,
-    marginBottom: 8,
+    marginTop: 24,
+    marginBottom: 12,
   },
   seeAllText: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#2563eb',
   },
   tripItem: {
     flexDirection: 'row',
     backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 16,
-    marginHorizontal: 16,
-    marginVertical: 6,
+    padding: 16,
+    borderRadius: 20,
+    marginVertical: 8,
+    elevation: 4,
     shadowColor: '#64748b',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
   },
   tripImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 12,
+    width: 90,
+    height: 90,
+    borderRadius: 14,
+    marginRight: 16,
+    resizeMode: 'cover', // Ensures the image scales nicely
   },
   tripInfo: {
     flex: 1,
     justifyContent: 'space-between',
   },
   tripDestination: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: '#1e293b',
   },
   tripDuration: {
     fontSize: 14,
     color: '#64748b',
-    marginBottom: 8,
+    marginTop: 4,
   },
   progressBar: {
-    height: 6,
+    height: 10,
     backgroundColor: '#e2e8f0',
-    borderRadius: 3,
+    borderRadius: 5,
     overflow: 'hidden',
-    marginBottom: 6,
+    marginTop: 10,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#2563eb',
+    borderRadius: 5,
   },
   tripProgress: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    marginTop: 10,
   },
   progressText: {
-    fontSize: 12,
-    color: '#2563eb',
+    fontSize: 14,
     fontWeight: '600',
+    color: '#2563eb',
   },
   tripCost: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1e293b',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 20,
-    width: '85%',
-    alignItems: 'center',
+    padding: 28,
+    borderRadius: 24,
+    width: '90%',
+    maxWidth: 400,
+    elevation: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.25,
-    shadowRadius: 15,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    width: '100%',
-    marginBottom: 20,
+    marginBottom: 24,
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: '#1e293b',
+    marginLeft: 8,
   },
   modalSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#64748b',
-    marginTop: 16,
-    marginBottom: 8,
+    textAlign: 'center',
+    marginVertical: 20,
   },
   memberQrContainer: {
     backgroundColor: '#f1f5f9',
     padding: 20,
-    borderRadius: 12,
-    marginVertical: 10,
+    borderRadius: 16,
+    alignItems: 'center',
   },
   memberDetails: {
     width: '100%',
-    marginVertical: 16,
+    marginVertical: 20,
   },
   detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
-    paddingBottom: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e2e8f0',
   },
   detailLabel: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#64748b',
+    fontWeight: '500',
   },
   detailValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#1e293b',
   },
