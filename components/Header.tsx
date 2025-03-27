@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { Link } from 'expo-router';
+import { Users } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from "@supabase/supabase-js";
 import Icon from "react-native-vector-icons/Feather";
@@ -106,7 +107,8 @@ export default function Header() {
       {groupName ? (
         <View>
           <TouchableOpacity onPress={toggleMembers}>
-            <Text style={styles.groupName}>{groupName}</Text>
+            <Text style={styles.groupName}>     <Users size={32} color="black" />
+            </Text>
           </TouchableOpacity>
           
           {showMembers && (
@@ -204,7 +206,7 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 18,
-    backgroundColor: '#bde0fe',
+    // backgroundColor: '#bde0fe',
     paddingHorizontal: 20,
     paddingVertical: 5,
     borderRadius: 20,
