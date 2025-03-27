@@ -33,6 +33,7 @@ export default function App() {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [showScrollPrompt, setShowScrollPrompt] = useState(true); // State for scroll prompt
 
   useEffect(() => {
     fetchUsers(1);
@@ -75,6 +76,20 @@ export default function App() {
     }
   };
 
+  // Handle scroll to hide the prompt
+  const handleScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+    {
+      useNativeDriver: true,
+      listener: (event: any) => {
+        const offsetY = event.nativeEvent.contentOffset.y;
+        if (offsetY > 20 && showScrollPrompt) { // Hide after scrolling 20px
+          setShowScrollPrompt(false);
+        }
+      },
+    }
+  );
+
   const renderPost = ({ item }: { item: Post }) => (
     <TouchableOpacity style={styles.postContainer} activeOpacity={0.9}>
       <Animatable.View animation="fadeInUp" duration={500}>
@@ -87,25 +102,22 @@ export default function App() {
   );
 
   const renderUser = ({ item, index }: { item: User; index: number }) => {
-    // Item height estimation
-    const ITEM_HEIGHT = 180; // Adjust based on your actual item height
-
-    // Fade in effect only when entering the view
+    const ITEM_HEIGHT = 180;
     const inputRange = [
-      (index - 1) * ITEM_HEIGHT, // Before entering
-      index * ITEM_HEIGHT,       // Fully visible
-      (index + 1) * ITEM_HEIGHT, // Still visible
+      (index - 1) * ITEM_HEIGHT,
+      index * ITEM_HEIGHT,
+      (index + 1) * ITEM_HEIGHT,
     ];
 
     const opacity = scrollY.interpolate({
       inputRange,
-      outputRange: [0, 1, 1], // Fade in from 0 to 1, then stay at 1
+      outputRange: [0, 1, 1],
       extrapolate: "clamp",
     });
 
     const scale = scrollY.interpolate({
       inputRange,
-      outputRange: [0.95, 1, 1], // Slight scale up, then stay at 1
+      outputRange: [0.95, 1, 1],
       extrapolate: "clamp",
     });
 
@@ -115,7 +127,7 @@ export default function App() {
           styles.userContainer,
           {
             transform: [{ scale }],
-            opacity, // All visible items stay at full opacity
+            opacity,
           },
         ]}
       >
@@ -142,6 +154,28 @@ export default function App() {
     );
   };
 
+  // Scroll Down Prompt Component
+  const ScrollPrompt = () => {
+    const fadeAnim = scrollY.interpolate({
+      inputRange: [0, 20],
+      outputRange: [1, 0],
+      extrapolate: "clamp",
+    });
+
+    return (
+      <Animated.View style={[styles.scrollPrompt, { opacity: fadeAnim }]}>
+        <Text style={styles.scrollText}>Scroll Down</Text>
+        <Animatable.View
+          animation="bounce"
+          iterationCount="infinite"
+          style={styles.arrowContainer}
+        >
+          <Text style={styles.arrow}>↓</Text>
+        </Animatable.View>
+      </Animated.View>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -162,15 +196,13 @@ export default function App() {
         keyExtractor={(user) => user.id.toString()}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        onScroll={Animated.event(
-          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
-        )}
+        onScroll={handleScroll}
         scrollEventThrottle={16}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
       />
+      {showScrollPrompt && <ScrollPrompt />}
     </View>
   );
 }
@@ -262,5 +294,25 @@ const styles = StyleSheet.create({
   footerLoader: {
     paddingVertical: 20,
     alignItems: "center",
+  },
+  scrollPrompt: {
+    position: "absolute",
+    bottom: 50,
+    alignSelf: "center",
+    alignItems: "center",
+  },
+  scrollText: {
+    fontSize: 16,
+    color: "#4f46e5",
+    fontWeight: "600",
+    marginBottom: 100,
+  },
+  arrowContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  arrow: {
+    fontSize: 24,
+    color: "#4f46e5",
   },
 });
