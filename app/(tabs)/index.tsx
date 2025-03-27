@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView } from 'react-native';
+import { View, StyleSheet, ScrollView, Text, TouchableOpacity, SafeAreaView, Image } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Initialize Supabase client (replace with your actual credentials)
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY );
+// Initialize Supabase client
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
 
 interface Member {
   name: string;
@@ -16,6 +16,13 @@ export default function HomeScreen() {
   const [groupName, setGroupName] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
+  const [showHero, setShowHero] = useState<boolean>(true); // New state to control hero section visibility
+
+  // Function to generate UI Avatars URL
+  const getUiAvatar = (name: string) => {
+    const encodedName = encodeURIComponent(name);
+    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
+  };
 
   useEffect(() => {
     const fetchLatestGroup = async () => {
@@ -64,21 +71,28 @@ export default function HomeScreen() {
     fetchLatestGroup();
   }, []);
 
+  // Function to handle "Get Started" button click
+  const handleGetStarted = () => {
+    setShowHero(false); // Hide the hero section
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container}>
-        {/* Hero Section */}
-        <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>
-            {groupName ? `${groupName}'s Community` : 'Connect. Collaborate. Share.'}
-          </Text>
-          <Text style={styles.heroSubtitle}>
-            The seamless platform for teams to work together, anywhere.
-          </Text>
-          <TouchableOpacity style={styles.ctaButton}>
-            <Text style={styles.ctaButtonText}>Get Started</Text>
-          </TouchableOpacity>
-        </View>
+        {/* Hero Section - Conditionally Rendered */}
+        {showHero && (
+          <View style={styles.heroSection}>
+            <Text style={styles.heroTitle}>
+              {groupName ? `${groupName}'s Community` : 'Connect. Collaborate. Share.'}
+            </Text>
+            <Text style={styles.heroSubtitle}>
+              The seamless platform for teams to work together, anywhere.
+            </Text>
+            <TouchableOpacity style={styles.ctaButton} onPress={handleGetStarted}>
+              <Text style={styles.ctaButtonText}>Get Started</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Members Section */}
         <View style={styles.membersSection}>
@@ -88,10 +102,18 @@ export default function HomeScreen() {
           ) : members.length > 0 ? (
             members.map((member, index) => (
               <View key={index} style={styles.memberCard}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                {member.email && (
-                  <Text style={styles.memberEmail}>{member.email}</Text>
-                )}
+                <View style={styles.memberCardContent}>
+                  <Image 
+                    source={{ uri: getUiAvatar(member.name) }} 
+                    style={styles.memberAvatar} 
+                  />
+                  <View>
+                    <Text style={styles.memberName}>{member.name}</Text>
+                    {member.email && (
+                      <Text style={styles.memberEmail}>{member.email}</Text>
+                    )}
+                  </View>
+                </View>
               </View>
             ))
           ) : (
@@ -99,9 +121,9 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* System Status Section */}
+        {/* Pending Status Section */}
         <View style={styles.statusSection}>
-          <Text style={styles.sectionTitle}>System Status</Text>
+          <Text style={styles.sectionTitle}>Pending Status</Text>
           <TouchableOpacity style={styles.statusButton}>
             <View style={styles.statusIndicator} />
             <Text style={styles.statusButtonText}>All Systems Operational</Text>
@@ -182,6 +204,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 5,
     elevation: 2,
+  },
+  memberCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  memberAvatar: {
+    width: 80,  
+    height: 80, 
+    borderRadius: 20,
+    marginRight: 15,
   },
   memberName: {
     fontSize: 16,

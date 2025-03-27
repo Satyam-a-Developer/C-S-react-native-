@@ -1,5 +1,16 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Image, FlatList, StyleSheet } from "react-native";
+import React, { useEffect, useState, useRef } from "react";
+import {
+  View,
+  Text,
+  Image,
+  FlatList,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  Animated,
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Animatable from "react-native-animatable";
 
 interface Post {
   id: number;
@@ -17,58 +28,148 @@ interface User {
 
 export default function App() {
   const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    async function fetchUsers() {
-      try {
-        const res = await fetch("https://jsonplaceholder.typicode.com/users");
-        const usersData = await res.json();
-        const postsRes = await fetch("https://jsonplaceholder.typicode.com/posts");
-        const postsData = await postsRes.json();
-
-        const combinedData = usersData.map((user: any) => ({
-          ...user,
-          avatar: `https://randomuser.me/api/portraits/men/₹{user.id}.jpg`,
-          posts: postsData.filter((post: Post) => post.userId === user.id).slice(0, 2),
-        })) as User[];
-
-        setUsers(combinedData);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    }
-    fetchUsers();
+    fetchUsers(1);
   }, []);
 
+  const fetchUsers = async (pageNum: number) => {
+    try {
+      if (pageNum === 1) setLoading(true);
+      else setIsFetchingMore(true);
+
+      const res = await fetch(`https://jsonplaceholder.typicode.com/users?_page=${pageNum}&_limit=5`);
+      const usersData = await res.json();
+      const postsRes = await fetch("https://jsonplaceholder.typicode.com/posts");
+      const postsData = await postsRes.json();
+
+      const combinedData = usersData.map((user: any) => ({
+        ...user,
+        avatar: `https://randomuser.me/api/portraits/men/${user.id + (pageNum - 1) * 5}.jpg`,
+        posts: postsData.filter((post: Post) => post.userId === user.id).slice(0, 2),
+      })) as User[];
+
+      if (combinedData.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      setUsers((prevUsers) => (pageNum === 1 ? combinedData : [...prevUsers, ...combinedData]));
+      setPage(pageNum);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+    } finally {
+      setLoading(false);
+      setIsFetchingMore(false);
+    }
+  };
+
+  const handleLoadMore = () => {
+    if (!isFetchingMore && hasMore) {
+      fetchUsers(page + 1);
+    }
+  };
+
   const renderPost = ({ item }: { item: Post }) => (
-    <View style={styles.postContainer}>
-      <Text style={styles.postTitle}>{item.title}</Text>
-      <Text style={styles.postBody}>{item.body}</Text>
-    </View>
+    <TouchableOpacity style={styles.postContainer} activeOpacity={0.9}>
+      <Animatable.View animation="fadeInUp" duration={500}>
+        <Text style={styles.postTitle}>{item.title}</Text>
+        <Text style={styles.postBody} numberOfLines={2} ellipsizeMode="tail">
+          {item.body}
+        </Text>
+      </Animatable.View>
+    </TouchableOpacity>
   );
 
-  const renderUser = ({ item }: { item: User }) => (
-    <View style={styles.userContainer}>
-      <View style={styles.userHeader}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
-        <Text style={styles.userName}>{item.name}</Text>
+  const renderUser = ({ item, index }: { item: User; index: number }) => {
+    // Item height estimation
+    const ITEM_HEIGHT = 180; // Adjust based on your actual item height
+
+    // Fade in effect only when entering the view
+    const inputRange = [
+      (index - 1) * ITEM_HEIGHT, // Before entering
+      index * ITEM_HEIGHT,       // Fully visible
+      (index + 1) * ITEM_HEIGHT, // Still visible
+    ];
+
+    const opacity = scrollY.interpolate({
+      inputRange,
+      outputRange: [0, 1, 1], // Fade in from 0 to 1, then stay at 1
+      extrapolate: "clamp",
+    });
+
+    const scale = scrollY.interpolate({
+      inputRange,
+      outputRange: [0.95, 1, 1], // Slight scale up, then stay at 1
+      extrapolate: "clamp",
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.userContainer,
+          {
+            transform: [{ scale }],
+            opacity, // All visible items stay at full opacity
+          },
+        ]}
+      >
+        <View style={styles.userHeader}>
+          <Image source={{ uri: item.avatar }} style={styles.avatar} />
+          <Text style={styles.userName}>{item.name}</Text>
+        </View>
+        <FlatList
+          data={item.posts}
+          renderItem={renderPost}
+          keyExtractor={(post) => post.id.toString()}
+          showsVerticalScrollIndicator={false}
+        />
+      </Animated.View>
+    );
+  };
+
+  const renderFooter = () => {
+    if (!isFetchingMore) return null;
+    return (
+      <View style={styles.footerLoader}>
+        <ActivityIndicator size="small" color="#4f46e5" />
       </View>
-      <FlatList
-        data={item.posts}
-        renderItem={renderPost}
-        keyExtractor={(post) => post.id.toString()}
-      />
-    </View>
-  );
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#4f46e5" />
+        <Text style={styles.loadingText}>Loading Friends' Talks...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Your Friends talks</Text>
-      <FlatList
+      <LinearGradient colors={["#4f46e5", "#1e3a8a"]} style={styles.headerGradient}>
+        <Text style={styles.header}>Your Friends' Talks</Text>
+      </LinearGradient>
+      <Animated.FlatList
         data={users}
         renderItem={renderUser}
         keyExtractor={(user) => user.id.toString()}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
+        scrollEventThrottle={16}
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
       />
     </View>
   );
@@ -77,60 +178,89 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
-    backgroundColor: "#f5f5f5",
-    paddingTop: 30,
+    backgroundColor: "#f1f5f9",
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 18,
+    color: "#4f46e5",
+    fontWeight: "600",
+  },
+  headerGradient: {
+    paddingTop: 50,
+    paddingBottom: 20,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   header: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1f2937", // gray-800
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
     textAlign: "center",
-    marginBottom: 14,
+    letterSpacing: 0.5,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 80,
   },
   userContainer: {
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
+    backgroundColor: "#fff",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.15,
     shadowRadius: 4,
-    elevation: 3, // For Android shadow
+    elevation: 3,
   },
   userHeader: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    marginRight: 16,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    marginRight: 12,
+    borderWidth: 2,
+    borderColor: "#4f46e5",
   },
   userName: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "600",
-    color: "#111827", // gray-900
+    color: "#1e293b",
+    flex: 1,
   },
   postContainer: {
-    padding: 16,
+    padding: 12,
     borderWidth: 1,
-    borderColor: "#e5e7eb", // gray-200
-    borderRadius: 8,
-    backgroundColor: "#f3f4f6", // gray-100
+    borderColor: "#e5e7eb",
+    borderRadius: 10,
+    backgroundColor: "#f9fafb",
     marginBottom: 8,
   },
   postTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#374151", // gray-700
+    color: "#374151",
     marginBottom: 4,
   },
   postBody: {
-    fontSize: 14,
-    color: "#4b5563", // gray-600
+    fontSize: 13,
+    color: "#6b7280",
+    lineHeight: 18,
+  },
+  footerLoader: {
+    paddingVertical: 20,
+    alignItems: "center",
   },
 });

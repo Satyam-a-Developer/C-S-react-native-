@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,11 @@ import {
   StyleSheet,
   Alert,
   SafeAreaView,
+  Keyboard,
+  TouchableWithoutFeedback,
+  KeyboardAvoidingView,
+  Platform,
+  Image,
 } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 import Icon from "react-native-vector-icons/Feather";
@@ -50,6 +55,20 @@ export default function BillSplittingScreen() {
   const [totalBill, setTotalBill] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<NavigationProp<any>>();
+  
+  // Ref for FlatList to help with scrolling
+  const flatListRef = useRef<FlatList>(null);
+
+  // Function to generate UI Avatars URL
+  const getUiAvatar = (name: string) => {
+    const encodedName = encodeURIComponent(name);
+    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
+  };
+
+  // Function to dismiss keyboard
+  const dismissKeyboard = () => {
+    Keyboard.dismiss();
+  };
 
   useEffect(() => {
     const fetchLatestGroup = async () => {
@@ -139,6 +158,13 @@ export default function BillSplittingScreen() {
       [...participants, { name: "", email: "", items: [{ description: "Shared Amount", amount: equalShare }] }]
         .map((p) => ({ ...p, items: [{ description: "Shared Amount", amount: totalBill / (participants.length + 1) }] }))
     );
+    
+    // Scroll to the end of the list after adding a participant
+    setTimeout(() => {
+      if (flatListRef.current) {
+        flatListRef.current.scrollToEnd({ animated: true });
+      }
+    }, 100);
   };
 
   const removeParticipant = (index: number) => {
@@ -198,7 +224,10 @@ export default function BillSplittingScreen() {
   const renderParticipant = ({ item, index }: { item: Participant; index: number }) => (
     <Animatable.View animation="fadeInUp" style={styles.participantCard}>
       <View style={styles.participantHeader}>
-        <Icon name="user" size={24} color="#6b7280" style={styles.icon} />
+        <Image
+          source={{ uri: getUiAvatar(item.name || "Unknown") }}
+          style={styles.participantAvatar}
+        />
         <TextInput
           style={styles.input}
           placeholder="Name"
@@ -206,6 +235,16 @@ export default function BillSplittingScreen() {
           onChangeText={(text) =>
             setParticipants(participants.map((p, idx) => idx === index ? { ...p, name: text } : p))
           }
+          onFocus={() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToIndex({ 
+                index: index, 
+                animated: true,
+                viewPosition: 0.5
+              });
+            }
+          }}
+          returnKeyType="next"
         />
         <TextInput
           style={styles.input}
@@ -214,6 +253,18 @@ export default function BillSplittingScreen() {
           onChangeText={(text) =>
             setParticipants(participants.map((p, idx) => idx === index ? { ...p, email: text } : p))
           }
+          onFocus={() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToIndex({ 
+                index: index, 
+                animated: true,
+                viewPosition: 0.5
+              });
+            }
+          }}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
         />
         {participants.length > 1 && (
           <TouchableOpacity onPress={() => removeParticipant(index)} style={styles.removeButton}>
@@ -229,6 +280,8 @@ export default function BillSplittingScreen() {
           value={item.items[0].amount.toFixed(2)}
           keyboardType="numeric"
           onChangeText={(text) => handleAmountChange(index, text)}
+          returnKeyType="done"
+          onSubmitEditing={dismissKeyboard}
         />
       </View>
     </Animatable.View>
@@ -245,63 +298,80 @@ export default function BillSplittingScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <LinearGradient colors={['#3b82f6', '#1e40af']} style={styles.headerGradient}>
-        <Text style={styles.header}>{groupDetails?.name || "Bill Splitting"}</Text>
-      </LinearGradient>
+    <TouchableWithoutFeedback onPress={dismissKeyboard}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+      >
+        <SafeAreaView style={styles.container}>
+          <LinearGradient colors={['#3b82f6', '#1e40af']} style={styles.headerGradient}>
+            <Text style={styles.header}>{groupDetails?.name || "Bill Splitting"}</Text>
+          </LinearGradient>
 
-      {groupDetails && (
-        <Animatable.View animation="fadeIn" style={styles.groupDetails}>
-          <Text style={styles.groupSubtitle}>Group Members</Text>
-          {[
-            { name: groupDetails.member1, email: groupDetails.member1_email },
-            { name: groupDetails.member2, email: groupDetails.member2_email },
-            { name: groupDetails.member3, email: groupDetails.member3_email },
-          ]
-            .filter((member) => member.name)
-            .map((member, index) => (
-              <View key={index} style={styles.memberRow}>
-                <Icon name="user" size={20} color="#2563eb" style={styles.icon} />
-                <Text style={styles.memberText}>{member.name} <Text style={styles.memberEmail}>({member.email})</Text></Text>
-              </View>
-            ))}
-        </Animatable.View>
-      )}
+          {groupDetails && (
+            <Animatable.View animation="fadeIn" style={styles.groupDetails}>
+              <Text style={styles.groupSubtitle}>Group Members</Text>
+              {[
+                { name: groupDetails.member1, email: groupDetails.member1_email },
+                { name: groupDetails.member2, email: groupDetails.member2_email },
+                { name: groupDetails.member3, email: groupDetails.member3_email },
+              ]
+                .filter((member) => member.name)
+                .map((member, index) => (
+                  <View key={index} style={styles.memberRow}>
+                    <Image
+                      source={{ uri: getUiAvatar(member.name) }}
+                      style={styles.memberAvatar}
+                    />
+                    <Text style={styles.memberText}>
+                      {member.name} <Text style={styles.memberEmail}>({member.email})</Text>
+                    </Text>
+                  </View>
+                ))}
+            </Animatable.View>
+          )}
 
-      <View style={styles.billContainer}>
-        <View style={styles.totalBillHeader}>
-          <Text style={styles.label}>Total Bill</Text>
-          <TextInput
-            style={styles.totalInput}
-            placeholder="₹0.00"
-            keyboardType="numeric"
-            value={totalBill ? totalBill.toString() : ""}
-            onChangeText={updateTotalBill}
-          />
-        </View>
+          <View style={styles.billContainer}>
+            <View style={styles.totalBillHeader}>
+              <Text style={styles.label}>Total Bill</Text>
+              <TextInput
+                style={styles.totalInput}
+                placeholder="₹0.00"
+                keyboardType="numeric"
+                value={totalBill ? totalBill.toString() : ""}
+                onChangeText={updateTotalBill}
+                returnKeyType="done"
+                onSubmitEditing={dismissKeyboard}
+              />
+            </View>
 
-        <FlatList
-          data={participants}
-          renderItem={renderParticipant}
-          keyExtractor={(_, index) => index.toString()}
-          showsVerticalScrollIndicator={false}
-          style={styles.participantList}
-        />
+            <FlatList
+              ref={flatListRef}
+              data={participants}
+              renderItem={renderParticipant}
+              keyExtractor={(_, index) => index.toString()}
+              showsVerticalScrollIndicator={false}
+              style={styles.participantList}
+              keyboardShouldPersistTaps="handled"
+            />
 
-        <View style={styles.footerActions}>
-          <TouchableOpacity onPress={addParticipant} style={styles.addButton}>
-            <Icon name="plus" size={20} color="#fff" />
-            <Text style={styles.addButtonText}>Add Participant</Text>
-          </TouchableOpacity>
-          <Text style={styles.totalText}>Total: ₹{totalBill.toFixed(2)}</Text>
-        </View>
+            <View style={styles.footerActions}>
+              <TouchableOpacity onPress={addParticipant} style={styles.addButton}>
+                <Icon name="plus" size={20} color="#fff" />
+                <Text style={styles.addButtonText}>Add Participant</Text>
+              </TouchableOpacity>
+              <Text style={styles.totalText}>Total: ₹{totalBill.toFixed(2)}</Text>
+            </View>
 
-        <TouchableOpacity onPress={sendBillToParticipants} style={styles.sendButton}>
-          <Text style={styles.sendButtonText}>Send Bill</Text>
-          <Icon name="send" size={20} color="#fff" style={styles.sendIcon} />
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+            <TouchableOpacity onPress={sendBillToParticipants} style={styles.sendButton}>
+              <Text style={styles.sendButtonText}>Send Bill</Text>
+              <Icon name="send" size={20} color="#fff" style={styles.sendIcon} />
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      </KeyboardAvoidingView>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -357,7 +427,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  icon: {
+  memberAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     marginRight: 10,
   },
   memberText: {
@@ -413,6 +486,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 10,
+  },
+  participantAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 10,
   },
   input: {
     flex: 1,

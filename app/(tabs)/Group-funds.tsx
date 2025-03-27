@@ -17,26 +17,50 @@ import {
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-native-qrcode-svg';
 import Icon from 'react-native-vector-icons/Ionicons';
-import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Animatable from 'react-native-animatable';
 
+// Import configuration 
+import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
+
 // Initialize Supabase client
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
-const { width } = Dimensions.get('window'); 
+const { width } = Dimensions.get('window');
+
+// Define types
+interface Member {
+  name: string;
+  email?: string;
+  savings: number;
+}
+
+interface GroupTrip {
+  destination: string;
+  cost: number;
+  duration: string;
+  image: string;
+  progress: number;
+}
 
 const MicroinvestmentScreen: React.FC = () => {
+  // State management
   const [groupName, setGroupName] = useState<string>('');
-  const [members, setMembers] = useState<{ name: string; savings: number }[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
   const [totalSavings, setTotalSavings] = useState<number>(0);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [showQrModal, setShowQrModal] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'savings' | 'trips'>('savings');
 
-  // Updated groupTrips with free Unsplash splash image URLs
-  const groupTrips = [
+  // Helper function to generate UI Avatars URL
+  const getUiAvatar = (name: string) => {
+    const encodedName = encodeURIComponent(name);
+    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
+  };
+
+  // Sample group trips data
+  const groupTrips: GroupTrip[] = [
     { 
       destination: 'Goa Beach', 
       cost: 5000, 
@@ -60,10 +84,12 @@ const MicroinvestmentScreen: React.FC = () => {
     },
   ];
 
+  // Fetch group data on component mount
   useEffect(() => {
     const fetchLatestGroup = async () => {
       setLoading(true);
       try {
+        // Retrieve group name from AsyncStorage
         const savedGroupName = await AsyncStorage.getItem('groupData');
         if (!savedGroupName) {
           setGroupName('Unnamed Group');
@@ -75,6 +101,7 @@ const MicroinvestmentScreen: React.FC = () => {
         const parsedGroupName = JSON.parse(savedGroupName);
         setGroupName(parsedGroupName);
 
+        // Fetch group details from Supabase
         const { data, error } = await supabase
           .from('groups')
           .select('name, member1, member1_email, member2, member2_email, member3, member3_email')
@@ -84,7 +111,8 @@ const MicroinvestmentScreen: React.FC = () => {
         if (error) throw new Error(`Supabase fetch error: ${error.message}`);
 
         if (data) {
-          const groupMembers = [
+          // Prepare group members
+          const groupMembers: Member[] = [
             { name: data.member1, email: data.member1_email, savings: 1250 },
             { name: data.member2, email: data.member2_email, savings: 980 },
             { name: data.member3, email: data.member3_email, savings: 650 },
@@ -109,27 +137,31 @@ const MicroinvestmentScreen: React.FC = () => {
     fetchLatestGroup();
   }, []);
 
-  const renderMember = ({ item }: { item: { name: string; savings: number } }) => (
+  // Render individual member card
+  const renderMember = ({ item }: { item: Member }) => (
     <Animatable.View animation="fadeIn" style={styles.memberCard}>
       <TouchableOpacity
         activeOpacity={0.8}
         onPress={() => setSelectedMember(item.name)}
       >
-        <View style={styles.memberIconContainer}>
-          <Icon name="person" size={40} color="#2563eb" />
-        </View>
+        <Image 
+          source={{ uri: getUiAvatar(item.name) }} 
+          style={styles.memberAvatar} 
+          defaultSource={{ uri: 'https://via.placeholder.com/64' }} 
+        />
         <Text style={styles.memberName}>{item.name}</Text>
         <Text style={styles.memberSavings}>₹{item.savings.toLocaleString()}</Text>
       </TouchableOpacity>
     </Animatable.View>
   );
 
-  const renderTrip = ({ item }: { item: { destination: string; cost: number; duration: string; image: string; progress: number } }) => (
+  // Render individual trip item
+  const renderTrip = ({ item }: { item: GroupTrip }) => (
     <Animatable.View animation="fadeInUp" style={styles.tripItem}>
       <Image 
         source={{ uri: item.image }} 
         style={styles.tripImage} 
-        defaultSource={{ uri: 'https://via.placeholder.com/90' }} // Fallback image
+        defaultSource={{ uri: 'https://via.placeholder.com/90' }} 
         onError={(e) => console.log(`Failed to load image for ${item.destination}: ${e.nativeEvent.error}`)}
       />
       <View style={styles.tripInfo}>
@@ -150,6 +182,7 @@ const MicroinvestmentScreen: React.FC = () => {
     </Animatable.View>
   );
 
+  // Loading state
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -289,7 +322,10 @@ const MicroinvestmentScreen: React.FC = () => {
           <Animatable.View animation="slideInUp" style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
-                <Icon name="person-outline" size={24} color="#2563eb" />
+                <Image 
+                  source={{ uri: selectedMember ? getUiAvatar(selectedMember) : '' }} 
+                  style={styles.modalMemberAvatar} 
+                />
                 <Text style={styles.modalTitle}>{selectedMember}</Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedMember(null)} activeOpacity={0.7}>
@@ -442,13 +478,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
-  memberIconContainer: {
+  memberAvatar: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#dbeafe',
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 8,
   },
   memberName: {
     fontSize: 16,
@@ -532,7 +567,7 @@ const styles = StyleSheet.create({
     height: 90,
     borderRadius: 14,
     marginRight: 16,
-    resizeMode: 'cover', // Ensures the image scales nicely
+    resizeMode: 'cover',
   },
   tripInfo: {
     flex: 1,
@@ -608,6 +643,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1e293b',
     marginLeft: 8,
+  },
+  modalMemberAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    marginRight: 12,
   },
   modalSubtitle: {
     fontSize: 15,

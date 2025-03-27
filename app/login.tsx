@@ -97,16 +97,16 @@ const GroupCreationForm: React.FC = () => {
               <Text style={styles.label}>Member {memberNum}</Text>
               <TextInput
                 style={styles.input}
-                value={groupData[`member₹{memberNum}Name` as keyof GroupData]}
-                onChangeText={(text) => handleChange(`member₹{memberNum}Name` as keyof GroupData, text)}
-                placeholder={`Member ₹{memberNum} Name`}
+                value={groupData[`member${memberNum}Name` as keyof GroupData]}
+                onChangeText={(text) => handleChange(`member${memberNum}Name` as keyof GroupData, text)}
+                placeholder={`Member ${memberNum} Name`}
                 autoCapitalize="words"
               />
               <TextInput
                 style={styles.input}
-                value={groupData[`member₹{memberNum}Email` as keyof GroupData]}
-                onChangeText={(text) => handleChange(`member₹{memberNum}Email` as keyof GroupData, text)}
-                placeholder={`Member ₹{memberNum} Email`}
+                value={groupData[`member${memberNum}Email` as keyof GroupData]}
+                onChangeText={(text) => handleChange(`member${memberNum}Email` as keyof GroupData, text)}
+                placeholder={`Member ${memberNum} Email`}
                 keyboardType="email-address"
                 autoCapitalize="none"
               />
@@ -127,17 +127,17 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 20,
-    paddingBottom: 40, // Extra padding at the bottom for scroll comfort
+    paddingBottom: 40,
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginTop: 100, // Matches mt-[100px] roughly
+    marginTop: 100,
     marginBottom: 20,
   },
   form: {
-    gap: 16, // Replaces space-y-4
+    gap: 16,
   },
   label: {
     fontSize: 16,
