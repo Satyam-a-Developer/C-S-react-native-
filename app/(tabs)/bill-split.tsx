@@ -12,17 +12,17 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
-  Image,
+  ActivityIndicator,
 } from "react-native";
 import { createClient } from "@supabase/supabase-js";
 import Icon from "react-native-vector-icons/Feather";
 import { useNavigation, NavigationProp } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Animatable from "react-native-animatable";
-import { LinearGradient } from "expo-linear-gradient";
 
-const SUPABASE_URL = 'https://nrbndwnsdegkfexmmaak.supabase.co';
-const SUPABASE_PUBLIC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yYm5kd25zZGVna2ZleG1tYWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NDU2NjAsImV4cCI6MjA1MzMyMTY2MH0.Ypit5O8aG9QuEiWyotZtjJ-ixErkHhN6zk-Yd9VKcwE';
+const SUPABASE_URL = "https://nrbndwnsdegkfexmmaak.supabase.co";
+const SUPABASE_PUBLIC_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yYm5kd25zZGVna2ZleG1tYWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NDU2NjAsImV4cCI6MjA1MzMyMTY2MH0.Ypit5O8aG9QuEiWyotZtjJ-ixErkHhN6zk-Yd9VKcwE";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
 
@@ -55,25 +55,14 @@ export default function BillSplittingScreen() {
   const [totalBill, setTotalBill] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation<NavigationProp<any>>();
-  
-  // Ref for FlatList to help with scrolling
   const flatListRef = useRef<FlatList>(null);
 
-  // Function to generate UI Avatars URL
-  const getUiAvatar = (name: string) => {
-    const encodedName = encodeURIComponent(name);
-    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
-  };
-
-  // Function to dismiss keyboard
-  const dismissKeyboard = () => {
-    Keyboard.dismiss();
-  };
+  const dismissKeyboard = () => Keyboard.dismiss();
 
   useEffect(() => {
     const fetchLatestGroup = async () => {
       try {
-        const storedGroupData = await AsyncStorage.getItem('groupData');
+        const storedGroupData = await AsyncStorage.getItem("groupData");
         const savedGroupName = storedGroupData ? JSON.parse(storedGroupData) : null;
 
         if (!savedGroupName) {
@@ -118,14 +107,16 @@ export default function BillSplittingScreen() {
     fetchLatestGroup();
   }, [navigation]);
 
-  const updateTotalBill = (value: string) => {
-    const newTotal = parseFloat(value) || 0;
+  const updateTotalBill = (text: string) => {
+    const newTotal = parseFloat(text.replace("₹", "")) || 0;
     setTotalBill(newTotal);
     const equalShare = newTotal / participants.length;
-    setParticipants(participants.map((p) => ({
-      ...p,
-      items: [{ description: "Shared Amount", amount: equalShare }],
-    })));
+    setParticipants(
+      participants.map((p) => ({
+        ...p,
+        items: [{ description: "Shared Amount", amount: equalShare }],
+      }))
+    );
   };
 
   const handleAmountChange = (participantIndex: number, value: string) => {
@@ -154,26 +145,34 @@ export default function BillSplittingScreen() {
 
   const addParticipant = () => {
     const equalShare = totalBill / (participants.length + 1);
-    setParticipants(
-      [...participants, { name: "", email: "", items: [{ description: "Shared Amount", amount: equalShare }] }]
-        .map((p) => ({ ...p, items: [{ description: "Shared Amount", amount: totalBill / (participants.length + 1) }] }))
-    );
-    
-    // Scroll to the end of the list after adding a participant
+    const newParticipants = [
+      ...participants.map((p) => ({
+        ...p,
+        items: [{ description: "Shared Amount", amount: equalShare }],
+      })),
+      { name: "", email: "", items: [{ description: "Shared Amount", amount: equalShare }] },
+    ];
+    setParticipants(newParticipants);
     setTimeout(() => {
       if (flatListRef.current) {
-        flatListRef.current.scrollToEnd({ animated: true });
+        flatListRef.current.scrollToIndex({
+          index: newParticipants.length - 1,
+          animated: true,
+          viewPosition: 0,
+        });
       }
-    }, 100);
+    }, 300);
   };
 
   const removeParticipant = (index: number) => {
     const newParticipants = participants.filter((_, i) => i !== index);
     const equalShare = totalBill / newParticipants.length;
-    setParticipants(newParticipants.map((p) => ({
-      ...p,
-      items: [{ description: "Shared Amount", amount: equalShare }],
-    })));
+    setParticipants(
+      newParticipants.map((p) => ({
+        ...p,
+        items: [{ description: "Shared Amount", amount: equalShare }],
+      }))
+    );
   };
 
   const sendBillToParticipants = async () => {
@@ -222,64 +221,69 @@ export default function BillSplittingScreen() {
   };
 
   const renderParticipant = ({ item, index }: { item: Participant; index: number }) => (
-    <Animatable.View animation="fadeInUp" style={styles.participantCard}>
+    <Animatable.View animation="fadeInUp" duration={300} style={styles.participantCard}>
       <View style={styles.participantHeader}>
-        <Image
-          source={{ uri: getUiAvatar(item.name || "Unknown") }}
-          style={styles.participantAvatar}
-        />
         <TextInput
-          style={styles.input}
-          placeholder="Name"
+          style={[styles.input, { borderColor: item.name ? "#d1d5db" : "#2563eb" }]}
+          placeholder="Enter name"
           value={item.name}
           onChangeText={(text) =>
-            setParticipants(participants.map((p, idx) => idx === index ? { ...p, name: text } : p))
+            setParticipants(participants.map((p, idx) => (idx === index ? { ...p, name: text } : p)))
           }
           onFocus={() => {
             if (flatListRef.current) {
-              flatListRef.current.scrollToIndex({ 
-                index: index, 
+              flatListRef.current.scrollToIndex({
+                index,
                 animated: true,
-                viewPosition: 0.5
+                viewPosition: 0.5,
               });
             }
           }}
-          returnKeyType="next"
-        />
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          value={item.email}
-          onChangeText={(text) =>
-            setParticipants(participants.map((p, idx) => idx === index ? { ...p, email: text } : p))
-          }
-          onFocus={() => {
-            if (flatListRef.current) {
-              flatListRef.current.scrollToIndex({ 
-                index: index, 
-                animated: true,
-                viewPosition: 0.5
-              });
-            }
-          }}
-          keyboardType="email-address"
-          autoCapitalize="none"
           returnKeyType="next"
         />
         {participants.length > 1 && (
           <TouchableOpacity onPress={() => removeParticipant(index)} style={styles.removeButton}>
-            <Icon name="trash-2" size={24} color="#ef4444" />
+            <Icon name="trash-2" size={20} color="#ef4444" />
           </TouchableOpacity>
         )}
       </View>
+      <TextInput
+        style={[styles.input, { borderColor: item.email ? "#d1d5db" : "#2563eb" }]}
+        placeholder="email@example.com"
+        value={item.email}
+        onChangeText={(text) =>
+          setParticipants(participants.map((p, idx) => (idx === index ? { ...p, email: text } : p)))
+        }
+        onFocus={() => {
+          if (flatListRef.current) {
+            flatListRef.current.scrollToIndex({
+              index,
+              animated: true,
+              viewPosition: 0.5,
+            });
+          }
+        }}
+        keyboardType="email-address"
+        autoCapitalize="none"
+        returnKeyType="next"
+      />
       <View style={styles.amountContainer}>
         <Text style={styles.amountLabel}>Amount:</Text>
         <TextInput
-          style={styles.amountInput}
+          style={[styles.amountInput, { borderColor: item.items[0].amount ? "#d1d5db" : "#2563eb" }]}
           placeholder="0.00"
-          value={item.items[0].amount.toFixed(2)}
+          value={item.items[0].amount.toString()}
           keyboardType="numeric"
           onChangeText={(text) => handleAmountChange(index, text)}
+          onFocus={() => {
+            if (flatListRef.current) {
+              flatListRef.current.scrollToIndex({
+                index,
+                animated: true,
+                viewPosition: 0.5,
+              });
+            }
+          }}
           returnKeyType="done"
           onSubmitEditing={dismissKeyboard}
         />
@@ -290,9 +294,8 @@ export default function BillSplittingScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
-        <Animatable.Text animation="pulse" easing="ease-out" iterationCount="infinite" style={styles.loadingText}>
-          Loading...
-        </Animatable.Text>
+        <ActivityIndicator size="large" color="#2563eb" />
+        <Text style={styles.loadingText}>Loading...</Text>
       </SafeAreaView>
     );
   }
@@ -302,44 +305,21 @@ export default function BillSplittingScreen() {
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 120 : 40}
       >
         <SafeAreaView style={styles.container}>
-          <LinearGradient colors={['#3b82f6', '#1e40af']} style={styles.headerGradient}>
-            <Text style={styles.header}>{groupDetails?.name || "Bill Splitting"}</Text>
-          </LinearGradient>
-
-          {groupDetails && (
-            <Animatable.View animation="fadeIn" style={styles.groupDetails}>
-              <Text style={styles.groupSubtitle}>Group Members</Text>
-              {[
-                { name: groupDetails.member1, email: groupDetails.member1_email },
-                { name: groupDetails.member2, email: groupDetails.member2_email },
-                { name: groupDetails.member3, email: groupDetails.member3_email },
-              ]
-                .filter((member) => member.name)
-                .map((member, index) => (
-                  <View key={index} style={styles.memberRow}>
-                    <Image
-                      source={{ uri: getUiAvatar(member.name) }}
-                      style={styles.memberAvatar}
-                    />
-                    <Text style={styles.memberText}>
-                      {member.name} <Text style={styles.memberEmail}>({member.email})</Text>
-                    </Text>
-                  </View>
-                ))}
-            </Animatable.View>
-          )}
+          <View style={styles.header}>
+            <Text style={styles.headerText}>{groupDetails?.name || "Bill Splitting"}</Text>
+          </View>
 
           <View style={styles.billContainer}>
             <View style={styles.totalBillHeader}>
               <Text style={styles.label}>Total Bill</Text>
               <TextInput
-                style={styles.totalInput}
+                style={[styles.totalInput, { borderColor: totalBill ? "#d1d5db" : "#2563eb" }]}
                 placeholder="₹0.00"
                 keyboardType="numeric"
-                value={totalBill ? totalBill.toString() : ""}
+                value={totalBill ? `₹${totalBill}` : ""}
                 onChangeText={updateTotalBill}
                 returnKeyType="done"
                 onSubmitEditing={dismissKeyboard}
@@ -353,21 +333,27 @@ export default function BillSplittingScreen() {
               keyExtractor={(_, index) => index.toString()}
               showsVerticalScrollIndicator={false}
               style={styles.participantList}
+              contentContainerStyle={{ paddingBottom: 10 }} // Increased for blurred summary
               keyboardShouldPersistTaps="handled"
             />
 
             <View style={styles.footerActions}>
               <TouchableOpacity onPress={addParticipant} style={styles.addButton}>
-                <Icon name="plus" size={20} color="#fff" />
-                <Text style={styles.addButtonText}>Add Participant</Text>
+                <Icon name="plus" size={28} color="#fff" />
               </TouchableOpacity>
-              <Text style={styles.totalText}>Total: ₹{totalBill.toFixed(2)}</Text>
+              <View style={styles.summaryContainer}>
+                <Text style={styles.totalText}>Total: ₹{totalBill.toFixed(2)}</Text>
+                {participants.map((participant, index) => (
+                  <Text key={index} style={styles.participantSummary}>
+                    {participant.name || `Person ${index + 1}`}: ₹{participant.items[0].amount.toFixed(2)}
+                  </Text>
+                ))}
+              </View>
+              <TouchableOpacity onPress={sendBillToParticipants} style={styles.sendButton}>
+                <Text style={styles.sendButtonText}>Send Bill</Text>
+                <Icon name="send" size={22} color="#fff" style={styles.sendIcon} />
+              </TouchableOpacity>
             </View>
-
-            <TouchableOpacity onPress={sendBillToParticipants} style={styles.sendButton}>
-              <Text style={styles.sendButtonText}>Send Bill</Text>
-              <Icon name="send" size={20} color="#fff" style={styles.sendIcon} />
-            </TouchableOpacity>
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -378,193 +364,159 @@ export default function BillSplittingScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f1f5f9",
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f8fafc',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#f1f5f9",
   },
   loadingText: {
-    fontSize: 20,
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  headerGradient: {
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    fontSize: 22,
+    color: "#2563eb",
+    fontWeight: "500",
+    marginTop: 10,
   },
   header: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#fff',
-    textAlign: 'center',
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 15,
+    backgroundColor: "#2563eb",
   },
-  groupDetails: {
-    padding: 15,
-    marginHorizontal: 15,
-    marginTop: -10,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    elevation: 5,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-  },
-  groupSubtitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 10,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  memberAvatar: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    marginRight: 10,
-  },
-  memberText: {
-    fontSize: 16,
-    color: '#1e293b',
-    fontWeight: '500',
-  },
-  memberEmail: {
-    fontSize: 14,
-    color: '#64748b',
+  headerText: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#fff",
+    textAlign: "center",
   },
   billContainer: {
     flex: 1,
-    padding: 20,
-    margin: 15,
-    backgroundColor: '#fff',
-    borderRadius: 15,
-    elevation: 3,
+    padding: 15,
+    backgroundColor: "#fff",
   },
   totalBillHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 20,
   },
   label: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1e293b',
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1e293b",
   },
   totalInput: {
-    width: 120,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
+    width: 140,
+    borderWidth: 2,
     borderRadius: 10,
-    padding: 10,
-    fontSize: 16,
-    backgroundColor: '#f8fafc',
-    textAlign: 'right',
+    padding: 12,
+    fontSize: 20,
+    backgroundColor: "#fff",
+    textAlign: "right",
   },
   participantList: {
     flexGrow: 1,
   },
   participantCard: {
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f9fafb",
     padding: 15,
-    borderRadius: 12,
-    marginBottom: 15,
+    borderRadius: 10,
+    marginBottom: 10,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: "#e5e7eb",
   },
   participantHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
-  },
-  participantAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 10,
   },
   input: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 8,
-    fontSize: 16,
-    marginRight: 10,
-    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 18,
+    backgroundColor: "#fff",
   },
   amountContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
   },
   amountLabel: {
     fontSize: 16,
-    color: '#64748b',
+    color: "#64748b",
+    fontWeight: "500",
   },
   amountInput: {
-    width: 100,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    padding: 8,
-    fontSize: 16,
-    textAlign: 'right',
-    backgroundColor: '#fff',
+    width: 120,
+    borderWidth: 2,
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 18,
+    textAlign: "right",
+    backgroundColor: "#fff",
   },
   removeButton: {
-    padding: 5,
+    padding: 8,
+    backgroundColor: "#fee2e2",
+    borderRadius: 20,
   },
   footerActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "column",
+    alignItems: "center",
     marginTop: 20,
   },
   addButton: {
-    flexDirection: 'row',
-    backgroundColor: '#22c55e',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 10,
-    alignItems: 'center',
+    position: "absolute",
+    bottom: 80,
+    right: 15,
+    width: 60,
+    height: 60,
+    backgroundColor: "#22c55e",
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
   },
-  addButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 8,
+  summaryContainer: {
+    width: "90%",
+    backgroundColor: "rgba(255, 255, 255, 0.2)", // Semi-transparent white
+    borderRadius: 15,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)", // Subtle border
   },
   totalText: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1e293b',
+    fontSize: 22,
+    fontWeight: "700",
+    color: "#1e293b",
+    marginBottom: 10,
+    textAlign: "center",
+  },
+  participantSummary: {
+    fontSize: 16,
+    color: "#1e293b",
+    marginBottom: 5,
+    textAlign: "center",
   },
   sendButton: {
-    flexDirection: 'row',
-    backgroundColor: '#2563eb',
+    flexDirection: "row",
+    backgroundColor: "#2563eb",
     paddingVertical: 15,
     paddingHorizontal: 20,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 20,
-    elevation: 5,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
   },
   sendButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: "600",
     marginRight: 10,
   },
   sendIcon: {

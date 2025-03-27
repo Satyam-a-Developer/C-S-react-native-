@@ -206,7 +206,6 @@ const styles = StyleSheet.create({
   },
   groupName: {
     fontSize: 18,
-    // backgroundColor: '#bde0fe',
     paddingHorizontal: 20,
     paddingVertical: 5,
     borderRadius: 20,
