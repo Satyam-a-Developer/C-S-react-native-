@@ -483,12 +483,12 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     width: "90%",
-    backgroundColor: "rgba(255, 255, 255, 0.2)", // Semi-transparent white
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     borderRadius: 15,
     padding: 15,
     marginBottom: 15,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)", // Subtle border
+    borderColor: "rgba(255, 255, 255, 0.3)",
   },
   totalText: {
     fontSize: 22,
