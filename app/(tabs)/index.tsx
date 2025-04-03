@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
+import { NavigationProp } from '@react-navigation/native';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -21,10 +22,9 @@ interface Member {
   email?: string;
   paymentStatus?: 'pending' | 'paid';
   amountDue?: number;
-  loanAmount?: number; // New field for loans you've given
+  loanAmount?: number;
 }
-
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation }: { navigation: NavigationProp<any> }) {
   const [groupName, setGroupName] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -60,9 +60,9 @@ export default function HomeScreen({ navigation }) {
 
         if (data) {
           const groupMembers = [
-            { name: data.member1, email: data.member1_email, paymentStatus: 'pending', amountDue: 599, loanAmount: 200 },
-            { name: data.member2, email: data.member2_email, paymentStatus: 'pending', amountDue: 599, loanAmount: 0 },
-            { name: data.member3, email: data.member3_email, paymentStatus: 'paid', amountDue: 0, loanAmount: 150 },
+            { name: data.member1, email: data.member1_email, paymentStatus: 'pending' as const, amountDue: 599, loanAmount: 200 },
+            { name: data.member2, email: data.member2_email, paymentStatus: 'pending' as const, amountDue: 599, loanAmount: 0 },
+            { name: data.member3, email: data.member3_email, paymentStatus: 'paid' as const, amountDue: 0, loanAmount: 150 },
           ].filter((member) => member.name);
 
           setMembers(groupMembers);
