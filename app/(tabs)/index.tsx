@@ -9,7 +9,7 @@ import {
   Image,
   Alert,
 } from 'react-native';
-import { NavigationProp } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import { createClient } from '@supabase/supabase-js';
 import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -23,8 +23,17 @@ interface Member {
   paymentStatus?: 'pending' | 'paid';
   amountDue?: number;
   loanAmount?: number;
+  paymentRecipient?: string; // Who the payment is going to
 }
-export default function HomeScreen({ navigation }: { navigation: NavigationProp<any> }) {
+
+
+
+type NavigationProps = {
+  navigate: (screen: string, params?: any) => void;
+};
+
+export default function HomeScreen() {
+  const navigation = useNavigation<NavigationProps>();
   const [groupName, setGroupName] = useState<string>('');
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -60,9 +69,30 @@ export default function HomeScreen({ navigation }: { navigation: NavigationProp<
 
         if (data) {
           const groupMembers = [
-            { name: data.member1, email: data.member1_email, paymentStatus: 'pending' as const, amountDue: 599, loanAmount: 200 },
-            { name: data.member2, email: data.member2_email, paymentStatus: 'pending' as const, amountDue: 599, loanAmount: 0 },
-            { name: data.member3, email: data.member3_email, paymentStatus: 'paid' as const, amountDue: 0, loanAmount: 150 },
+            { 
+              name: data.member1, 
+              email: data.member1_email, 
+              paymentStatus: 'pending' as const, 
+              amountDue: 599, 
+              loanAmount: 200,
+              paymentRecipient: 'Group Treasurer' // Example recipient
+            },
+            { 
+              name: data.member2, 
+              email: data.member2_email, 
+              paymentStatus: 'pending' as const, 
+              amountDue: 599, 
+              loanAmount: 0,
+              paymentRecipient: 'Group Admin' // Example recipient
+            },
+            { 
+              name: data.member3, 
+              email: data.member3_email, 
+              paymentStatus: 'paid' as const, 
+              amountDue: 0, 
+              loanAmount: 150,
+              paymentRecipient: 'Group Fund'
+            },
           ].filter((member) => member.name);
 
           setMembers(groupMembers);
@@ -89,15 +119,17 @@ export default function HomeScreen({ navigation }: { navigation: NavigationProp<
   const handlePayment = (member: Member) => {
     Alert.alert(
       `Pay for ${member.name}`,
-      `Amount Due: ₹${member.amountDue}`,
+      `Amount Due: ₹${member.amountDue} to ${member.paymentRecipient}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Proceed to Payment',
           onPress: () => {
+            // console.log('PaymentScreen not implemented yet');
             navigation.navigate('PaymentScreen', {
               memberName: member.name,
               amount: member.amountDue,
+              recipient: member.paymentRecipient,
               onPaymentSuccess: () => {
                 setMembers((prevMembers) =>
                   prevMembers.map((m) =>
@@ -135,7 +167,7 @@ export default function HomeScreen({ navigation }: { navigation: NavigationProp<
               {groupName ? `Welcome to ${groupName}'s Community` : 'Connect. Collaborate. Share.'}
             </Text>
             <Text style={styles.heroSubtitle}>
-              Your team’s hub for seamless collaboration, anywhere, anytime.
+              Your team's hub for seamless collaboration, anywhere, anytime.
             </Text>
             <TouchableOpacity style={styles.ctaButton} onPress={handleGetStarted}>
               <Text style={styles.ctaButtonText}>Get Started</Text>
@@ -161,9 +193,54 @@ export default function HomeScreen({ navigation }: { navigation: NavigationProp<
           </View>
         </View>
 
-        {/* New Loans Section */}
+        {/* Pending Payment Status Section */}
+        <View style={styles.statusSection}>
+          <Text style={styles.sectionTitle}>Pending Payment Status</Text>
+          {loading ? (
+            <Text style={styles.loadingText}>Loading payment statuses...</Text>
+          ) : members.filter(m => m.paymentStatus === 'pending').length > 0 ? (
+            members
+              .filter(m => m.paymentStatus === 'pending')
+              .map((member, index) => (
+                <View key={index} style={styles.statusCard}>
+                  <View style={styles.statusCardContent}>
+                    <Image source={{ uri: getUiAvatar(member.name) }} style={styles.memberAvatar} />
+                    <View style={styles.statusDetails}>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+                      <View style={styles.paymentRecipientContainer}>
+                        <Ionicons name="arrow-forward" size={16} color="#64748B" />
+                        <Text style={styles.paymentRecipient}>To: {member.paymentRecipient}</Text>
+                      </View>
+                    </View>
+                    <View style={styles.paymentInfo}>
+                      <Text style={styles.paymentAmount}>₹{member.amountDue}</Text>
+                      <View
+                        style={[
+                          styles.statusBadge,
+                          { backgroundColor: '#F59E0B' },
+                        ]}
+                      >
+                        <Text style={styles.statusText}>Pending</Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.payButton}
+                        onPress={() => handlePayment(member)}
+                      >
+                        <Text style={styles.payButtonText}>Pay Now</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              ))
+          ) : (
+            <Text style={styles.noMembersText}>No pending payments</Text>
+          )}
+        </View>
+
+        {/* Loans Section */}
         <View style={styles.loansSection}>
-          <Text style={styles.sectionTitle}>Loans You’ve Given</Text>
+          <Text style={styles.sectionTitle}>Loans You've Given</Text>
           {loading ? (
             <Text style={styles.loadingText}>Loading loan statuses...</Text>
           ) : members.filter((m) => m.loanAmount && m.loanAmount > 0).length > 0 ? (
@@ -176,6 +253,10 @@ export default function HomeScreen({ navigation }: { navigation: NavigationProp<
                     <View style={styles.loanDetails}>
                       <Text style={styles.memberName}>{member.name}</Text>
                       {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+                      <View style={styles.loanDirectionContainer}>
+                        <Ionicons name="arrow-back" size={16} color="#D97706" />
+                        <Text style={styles.loanDirection}>Owes you</Text>
+                      </View>
                     </View>
                     <View style={styles.loanInfo}>
                       <Text style={styles.loanAmount}>₹{member.loanAmount}</Text>
@@ -191,48 +272,6 @@ export default function HomeScreen({ navigation }: { navigation: NavigationProp<
               ))
           ) : (
             <Text style={styles.noMembersText}>No loans given</Text>
-          )}
-        </View>
-
-        <View style={styles.statusSection}>
-          <Text style={styles.sectionTitle}>Pending Payment Status</Text>
-          {loading ? (
-            <Text style={styles.loadingText}>Loading payment statuses...</Text>
-          ) : members.length > 0 ? (
-            members.map((member, index) => (
-              <View key={index} style={styles.statusCard}>
-                <View style={styles.statusCardContent}>
-                  <Image source={{ uri: getUiAvatar(member.name) }} style={styles.memberAvatar} />
-                  <View style={styles.statusDetails}>
-                    <Text style={styles.memberName}>{member.name}</Text>
-                    {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
-                  </View>
-                  <View style={styles.paymentInfo}>
-                    <Text style={styles.paymentAmount}>₹{member.amountDue}</Text>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        { backgroundColor: member.paymentStatus === 'paid' ? '#34C759' : '#F59E0B' },
-                      ]}
-                    >
-                      <Text style={styles.statusText}>
-                        {member.paymentStatus === 'paid' ? 'Paid' : 'Pending'}
-                      </Text>
-                    </View>
-                    {member.paymentStatus === 'pending' && (
-                      <TouchableOpacity
-                        style={styles.payButton}
-                        onPress={() => handlePayment(member)}
-                      >
-                        <Text style={styles.payButtonText}>Pay Now</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noMembersText}>No payment statuses found</Text>
           )}
         </View>
 
@@ -341,6 +380,28 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     color: '#64748B',
+  },
+  paymentRecipientContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  paymentRecipient: {
+    fontSize: 14,
+    color: '#64748B',
+    marginLeft: 5,
+    fontStyle: 'italic',
+  },
+  loanDirectionContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  loanDirection: {
+    fontSize: 14,
+    color: '#D97706',
+    marginLeft: 5,
+    fontWeight: '500',
   },
   loansSection: {
     padding: 25,
