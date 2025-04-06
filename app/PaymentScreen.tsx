@@ -19,6 +19,7 @@ import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface PaymentMethod {
   id: string;
@@ -26,8 +27,16 @@ interface PaymentMethod {
   icon: string;
   iconType: 'ionicons' | 'fontawesome';
   color: string;
-  packageName?: string; // Android package name
-  urlScheme?: string;   // iOS URL scheme
+  packageName?: string;
+  urlScheme?: string;
+}
+
+interface Transaction {
+  id: string;
+  method: string;
+  amount: string;
+  date: string;
+  status: 'success' | 'failed' | 'pending';
 }
 
 export default function PaymentScreen() {
@@ -40,8 +49,8 @@ export default function PaymentScreen() {
   const [upiId, setUpiId] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [transactionStatus, setTransactionStatus] = useState<string | null>(null);
 
-  // Card validation states
   const [cardErrors, setCardErrors] = useState({
     number: '',
     holder: '',
@@ -49,44 +58,42 @@ export default function PaymentScreen() {
     cvv: '',
   });
 
-  // UPI validation state
   const [upiError, setUpiError] = useState('');
 
-  // Enhanced payment options with app-specific data
   const paymentOptions: PaymentMethod[] = [
-    { 
-      id: 'gpay', 
-      name: 'Google Pay', 
-      icon: 'google-pay', 
-      iconType: 'fontawesome', 
+    {
+      id: 'gpay',
+      name: 'Google Pay',
+      icon: 'google-pay',
+      iconType: 'fontawesome',
       color: '#4285F4',
       packageName: 'com.google.android.apps.nbu.paisa.user',
-      urlScheme: 'googlepay://'
+      urlScheme: 'gpay://',
     },
-    { 
-      id: 'phonepe', 
-      name: 'PhonePe', 
-      icon: 'mobile-alt', 
-      iconType: 'fontawesome', 
+    {
+      id: 'phonepe',
+      name: 'PhonePe',
+      icon: 'mobile-alt',
+      iconType: 'fontawesome',
       color: '#5F259F',
       packageName: 'com.phonepe.app',
-      urlScheme: 'phonepe://'
+      urlScheme: 'phonepe://',
     },
-    { 
-      id: 'paytm', 
-      name: 'Paytm', 
-      icon: 'wallet', 
-      iconType: 'ionicons', 
+    {
+      id: 'paytm',
+      name: 'Paytm',
+      icon: 'wallet',
+      iconType: 'ionicons',
       color: '#00BAF2',
       packageName: 'net.one97.paytm',
-      urlScheme: 'paytm://'
+      urlScheme: 'paytm://',
     },
-    { 
-      id: 'card', 
-      name: 'Credit/Debit Card', 
-      icon: 'credit-card', 
-      iconType: 'fontawesome', 
-      color: '#1E293B' 
+    {
+      id: 'card',
+      name: 'Credit/Debit Card',
+      icon: 'credit-card',
+      iconType: 'fontawesome',
+      color: '#1E293B',
     },
   ];
 
@@ -104,72 +111,70 @@ export default function PaymentScreen() {
     };
   }, []);
 
-  // Format card number as user types (adds spaces every 4 digits)
   const formatCardNumber = (text: string) => {
     const cleaned = text.replace(/\s+/g, '').replace(/\D/g, '');
     const groups = [];
-    
     for (let i = 0; i < cleaned.length; i += 4) {
       groups.push(cleaned.substring(i, i + 4));
     }
-    
     return groups.join(' ').trim();
   };
 
-  // Format expiry date as MM/YY
   const formatExpiry = (text: string) => {
     const cleaned = text.replace(/\D/g, '');
-    
     if (cleaned.length >= 3) {
       return `${cleaned.substring(0, 2)}/${cleaned.substring(2, 4)}`;
     } else if (cleaned.length === 2) {
       return `${cleaned}/`;
     }
-    
     return cleaned;
   };
 
-  // Validate card details
   const validateCard = () => {
-    const errors = {
-      number: '',
-      holder: '',
-      expiry: '',
-      cvv: '',
-    };
+    const errors = { number: '', holder: '', expiry: '', cvv: '' };
     let isValid = true;
 
-    // Card number validation (basic check for length)
-    if (cardNumber.replace(/\s+/g, '').length !== 16) {
+    const luhnCheck = (num: string) => {
+      let sum = 0;
+      let shouldDouble = false;
+      for (let i = num.length - 1; i >= 0; i--) {
+        let digit = parseInt(num.charAt(i));
+        if (shouldDouble) {
+          digit *= 2;
+          if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        shouldDouble = !shouldDouble;
+      }
+      return sum % 10 === 0;
+    };
+
+    const cleanedCardNumber = cardNumber.replace(/\s+/g, '');
+    if (cleanedCardNumber.length !== 16 || !luhnCheck(cleanedCardNumber)) {
       errors.number = 'Please enter a valid 16-digit card number';
       isValid = false;
     }
 
-    // Card holder validation
     if (!cardHolder.trim()) {
       errors.holder = 'Please enter cardholder name';
       isValid = false;
     }
 
-    // Expiry validation
     const expiryPattern = /^(0[1-9]|1[0-2])\/\d{2}$/;
     if (!expiryPattern.test(expiry)) {
       errors.expiry = 'Enter a valid date (MM/YY)';
       isValid = false;
     } else {
-      // Check if card is expired
       const [month, year] = expiry.split('/');
       const expiryDate = new Date(2000 + parseInt(year), parseInt(month) - 1, 1);
       const today = new Date();
-      
       if (expiryDate < today) {
         errors.expiry = 'Card has expired';
         isValid = false;
       }
     }
 
-    // CVV validation
-    if (cvv.length !== 3) {
+    if (cvv.length !== 3 || !/^\d{3}$/.test(cvv)) {
       errors.cvv = 'Enter a valid 3-digit CVV';
       isValid = false;
     }
@@ -178,93 +183,152 @@ export default function PaymentScreen() {
     return isValid;
   };
 
-  // Validate UPI ID
   const validateUpi = () => {
-    const upiPattern = /^[\w.-]+@[\w.-]+$/;
-    
-    if (!upiPattern.test(upiId)) {
-      setUpiError('Please enter a valid UPI ID (e.g., name@upi)');
-      return false;
+    if (selectedMethod === 'gpay' || selectedMethod === 'phonepe' || selectedMethod === 'paytm') {
+      if (!upiId.trim()) {
+        setUpiError('Please enter a valid UPI ID (e.g., name@upi)');
+        return false;
+      }
+      const upiPattern = /^[\w.-]+@[\w.-]+$/;
+      if (!upiPattern.test(upiId)) {
+        setUpiError('Please enter a valid UPI ID (e.g., name@upi)');
+        return false;
+      }
     }
-    
     setUpiError('');
     return true;
   };
 
-  // Handle UPI payment with improved app handling
-  const handleUpiPayment = async (method: PaymentMethod) => {
-    if (!validateUpi()) {
-      return;
-    }
-
-    setIsProcessing(true);
-
-    // Create UPI payment URL with more details and the proper reference
-    const orderId = `ORD${Date.now()}`;
-    const upiUrl = `upi://pay?pa=${upiId}&pn=Store%20Payment&mc=5411&tid=${orderId}&tr=${orderId}&tn=Order%20Payment&am=999.00&cu=INR`;
-    
+  const saveTransaction = async (transaction: Transaction) => {
     try {
-      // Try the generic UPI intent first - this works with any UPI app on the device
-      Linking.openURL(upiUrl)
-        .then(() => {
-          console.log('UPI URL opened successfully');
-          // Wait briefly to ensure the UPI app has time to open
-          setTimeout(() => setIsProcessing(false), 500);
-        })
-        .catch(async (error) => {
-          console.error('Error opening generic UPI URL:', error);
-          
-          // If generic UPI fails, try the app-specific scheme as fallback
-          if (method.urlScheme || method.packageName) {
-            try {
-              const appUrl = Platform.OS === 'ios' ? method.urlScheme : `${method.packageName}://`;
-              if (appUrl) {
-                const canOpen = await Linking.canOpenURL(appUrl);
-                if (canOpen) {
-                  await Linking.openURL(appUrl);
-                  setTimeout(() => setIsProcessing(false), 500);
-                } else {
-                  handleUpiAppNotFound(method);
-                }
-              } else {
-                handleUpiAppNotFound(method);
-              }
-            } catch (appError) {
-              console.error('Error opening specific app:', appError);
-              handleUpiAppNotFound(method);
-            }
-          } else {
-            handleUpiAppNotFound(method);
-          }
-        });
+      const existingTransactions = await AsyncStorage.getItem('transactions');
+      const transactions = existingTransactions ? JSON.parse(existingTransactions) : [];
+      transactions.push(transaction);
+      await AsyncStorage.setItem('transactions', JSON.stringify(transactions));
     } catch (error) {
-      console.error('General error in UPI handling:', error);
-      setIsProcessing(false);
-      Alert.alert('Error', 'Something went wrong while processing your payment.');
+      console.error('Error saving transaction:', error);
     }
   };
 
-  // Handle case when UPI app is not found
+  const simulatePaymentApiCall = async (paymentData: any) => {
+    return new Promise((resolve, reject) => {
+      setTimeout(() => {
+        if (Math.random() < 0.9) {
+          resolve({ status: 'success', transactionId: `TXN${Date.now()}` });
+        } else {
+          reject(new Error('Payment processing failed'));
+        }
+      }, 2000);
+    });
+  };
+
+  const openPaymentApp = async (method: PaymentMethod) => {
+    if (!validateUpi()) return;
+
+    setIsProcessing(true);
+    const orderId = `ORD${Date.now()}`;
+    const amount = "999.00";
+    const transaction: Transaction = {
+      id: orderId,
+      method: method.name,
+      amount,
+      date: new Date().toISOString(),
+      status: 'pending',
+    };
+
+    try {
+      // Specific handling for Google Pay
+      if (method.id === 'gpay') {
+        const gpayUrl = `gpay://upi/pay?pa=${upiId}&pn=Store%20Payment&mc=5411&tid=${orderId}&tr=${orderId}&tn=Order%20Payment&am=${amount}&cu=INR`;
+        
+        if (Platform.OS === 'android') {
+          // Android-specific Google Pay intent
+          const gpayIntent = `intent://${method.packageName}/upi/pay?pa=${upiId}&pn=Store%20Payment&mc=5411&tid=${orderId}&tr=${orderId}&tn=Order%20Payment&am=${amount}&cu=INR#Intent;scheme=gpay;package=com.google.android.apps.nbu.paisa.user;end`;
+          
+          try {
+            const canOpen = await Linking.canOpenURL(gpayIntent);
+            if (canOpen) {
+              await Linking.openURL(gpayIntent);
+            } else {
+              await Linking.openURL(gpayUrl);
+            }
+            transaction.status = 'success';
+            await saveTransaction(transaction);
+            setTransactionStatus('success');
+          } catch (error) {
+            console.log('Google Pay intent failed, trying direct URL:', error);
+            await Linking.openURL(gpayUrl);
+            transaction.status = 'success';
+            await saveTransaction(transaction);
+            setTransactionStatus('success');
+          }
+        } else {
+          // iOS-specific Google Pay handling
+          const canOpen = await Linking.canOpenURL(method.urlScheme || '');
+          if (canOpen) {
+            await Linking.openURL(gpayUrl);
+            transaction.status = 'success';
+            await saveTransaction(transaction);
+            setTransactionStatus('success');
+          } else {
+            throw new Error('Google Pay not installed');
+          }
+        }
+      } else {
+        // Handling for other UPI apps
+        const upiUrl = `${method.urlScheme}pay?pa=${upiId}&pn=Store%20Payment&mc=5411&tid=${orderId}&tr=${orderId}&tn=Order%20Payment&am=${amount}&cu=INR`;
+        
+        if (Platform.OS === 'android') {
+          const appIntent = `intent://pay?pa=${upiId}&pn=Store%20Payment&mc=5411&tid=${orderId}&tr=${orderId}&tn=Order%20Payment&am=${amount}&cu=INR#Intent;scheme=${method.urlScheme?.replace('://', '')};package=${method.packageName};end`;
+          
+          try {
+            await Linking.openURL(appIntent);
+            transaction.status = 'success';
+            await saveTransaction(transaction);
+            setTransactionStatus('success');
+          } catch (error) {
+            await Linking.openURL(upiUrl);
+            transaction.status = 'success';
+            await saveTransaction(transaction);
+            setTransactionStatus('success');
+          }
+        } else {
+          const canOpen = await Linking.canOpenURL(method.urlScheme || '');
+          if (canOpen) {
+            await Linking.openURL(upiUrl);
+            transaction.status = 'success';
+            await saveTransaction(transaction);
+            setTransactionStatus('success');
+          } else {
+            throw new Error(`${method.name} not installed`);
+          }
+        }
+      }
+
+      setTimeout(() => {
+        setIsProcessing(false);
+        navigation.navigate('OrderConfirmation', { transaction });
+      }, 1000);
+    } catch (error) {
+      transaction.status = 'failed';
+      await saveTransaction(transaction);
+      setTransactionStatus('failed');
+      handleUpiAppNotFound(method);
+    }
+  };
+
   const handleUpiAppNotFound = (method: PaymentMethod) => {
     setIsProcessing(false);
-    
-    // Get system-appropriate store URL
-    const storeUrl = Platform.OS === 'ios' 
-      ? `https://apps.apple.com/search?term=${method.name.toLowerCase().replace(/\s+/g, '-')}` 
+    const storeUrl = Platform.OS === 'ios'
+      ? `https://apps.apple.com/search?term=${method.name.toLowerCase().replace(/\s+/g, '-')}`
       : `market://details?id=${method.packageName}`;
-    
+
     Alert.alert(
-      'UPI App Required', 
+      'UPI App Required',
       `To complete this payment, you need the ${method.name} app.`,
       [
-        { 
-          text: 'Get App', 
-          onPress: () => Linking.openURL(storeUrl)
-        },
-        { 
-          text: 'Use Different Method', 
-          style: 'cancel'
-        }
+        { text: 'Get App', onPress: () => Linking.openURL(storeUrl) },
+        { text: 'Use Different Method', style: 'cancel' }
       ]
     );
   };
@@ -274,29 +338,56 @@ export default function PaymentScreen() {
     Keyboard.dismiss();
 
     if (selectedMethod === 'card') {
-      if (!validateCard()) {
-        return;
-      }
+      if (!validateCard()) return;
 
       setIsProcessing(true);
-      
-      // Simulate payment processing
-      setTimeout(() => {
+      const transaction: Transaction = {
+        id: `ORD${Date.now()}`,
+        method: 'Card',
+        amount: '999.00',
+        date: new Date().toISOString(),
+        status: 'pending',
+      };
+
+      try {
+        const paymentData = {
+          cardNumber: cardNumber.replace(/\s+/g, ''),
+          cardHolder,
+          expiry,
+          cvv,
+          amount: '999.00',
+        };
+
+        const response = await simulatePaymentApiCall(paymentData);
+        transaction.status = 'success';
+        await saveTransaction(transaction);
+        setTransactionStatus('success');
+
+        setTimeout(() => {
+          setIsProcessing(false);
+          Alert.alert(
+            'Payment Successful',
+            'Your card payment has been processed successfully.',
+            [{ text: 'OK', onPress: () => navigation.navigate('OrderConfirmation', { transaction }) }]
+          );
+        }, 500);
+      } catch (error) {
+        transaction.status = 'failed';
+        await saveTransaction(transaction);
+        setTransactionStatus('failed');
         setIsProcessing(false);
         Alert.alert(
-          'Payment Successful',
-          'Your card payment has been processed successfully.',
-          [{ text: 'OK', onPress: () => navigation.navigate('OrderConfirmation') }]
+          'Payment Failed',
+          'There was an error processing your payment. Please try again.',
+          [{ text: 'OK' }]
         );
-      }, 2000);
-      
+      }
       return;
     }
 
-    // Handle UPI payment methods
     const selectedOption = paymentOptions.find(option => option.id === selectedMethod);
     if (selectedOption) {
-      handleUpiPayment(selectedOption);
+      await openPaymentApp(selectedOption);
     }
   };
 
@@ -309,37 +400,35 @@ export default function PaymentScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <SafeAreaView style={styles.safeArea}>
           <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Header */}
             <View style={styles.header}>
-              <TouchableOpacity 
-                style={styles.backButton}
-                onPress={() => navigation.goBack()}
-              >
+              <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                 <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <Text style={styles.headerTitle}>Payment</Text>
             </View>
 
-            {/* Order Summary */}
             <View style={styles.orderSummary}>
               <Text style={styles.summaryTitle}>Order Summary</Text>
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryLabel}>Total Amount</Text>
                 <Text style={styles.summaryValue}>₹999.00</Text>
               </View>
+              {transactionStatus && (
+                <Text style={[
+                  styles.statusText,
+                  { color: transactionStatus === 'success' ? '#22C55E' : '#EF4444' }
+                ]}>
+                  {transactionStatus === 'success' ? 'Payment Successful' : 'Payment Failed'}
+                </Text>
+              )}
             </View>
 
-            {/* Payment Options */}
             <View style={styles.paymentOptions}>
               <Text style={styles.sectionTitle}>Choose Payment Method</Text>
-
               {paymentOptions.map((option) => (
                 <TouchableOpacity
                   key={option.id}
@@ -349,20 +438,21 @@ export default function PaymentScreen() {
                   ]}
                   onPress={() => {
                     setSelectedMethod(option.id);
-                    // Reset errors when changing payment method
                     setCardErrors({ number: '', holder: '', expiry: '', cvv: '' });
                     setUpiError('');
+                    setTransactionStatus(null);
                   }}
                 >
-                  <View style={[styles.iconContainer, selectedMethod === option.id && { backgroundColor: `${option.color}20` }]}>
+                  <View style={[
+                    styles.iconContainer,
+                    selectedMethod === option.id && { backgroundColor: `${option.color}20` }
+                  ]}>
                     {renderIcon(option)}
                   </View>
-                  <Text
-                    style={[
-                      styles.optionText,
-                      selectedMethod === option.id && { color: option.color, fontWeight: '600' },
-                    ]}
-                  >
+                  <Text style={[
+                    styles.optionText,
+                    selectedMethod === option.id && { color: option.color, fontWeight: '600' },
+                  ]}>
                     {option.name}
                   </Text>
                   {selectedMethod === option.id && (
@@ -372,17 +462,11 @@ export default function PaymentScreen() {
               ))}
             </View>
 
-            {/* Payment Details */}
             {selectedMethod && (
-              <Animated.View 
-                style={styles.paymentDetails}
-                entering={FadeIn.duration(300)}
-                exiting={FadeOut.duration(300)}
-              >
+              <Animated.View style={styles.paymentDetails} entering={FadeIn.duration(300)} exiting={FadeOut.duration(300)}>
                 {selectedMethod === 'card' && (
                   <View style={styles.cardDetails}>
                     <Text style={styles.detailsTitle}>Card Details</Text>
-                    
                     <View style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Card Number</Text>
                       <TextInput
@@ -391,11 +475,10 @@ export default function PaymentScreen() {
                         value={cardNumber}
                         onChangeText={(text) => setCardNumber(formatCardNumber(text))}
                         keyboardType="numeric"
-                        maxLength={19} // 16 digits + 3 spaces
+                        maxLength={19}
                       />
-                      {cardErrors.number ? <Text style={styles.errorText}>{cardErrors.number}</Text> : null}
+                      {cardErrors.number && <Text style={styles.errorText}>{cardErrors.number}</Text>}
                     </View>
-
                     <View style={styles.inputContainer}>
                       <Text style={styles.inputLabel}>Cardholder Name</Text>
                       <TextInput
@@ -405,9 +488,8 @@ export default function PaymentScreen() {
                         onChangeText={setCardHolder}
                         autoCapitalize="words"
                       />
-                      {cardErrors.holder ? <Text style={styles.errorText}>{cardErrors.holder}</Text> : null}
+                      {cardErrors.holder && <Text style={styles.errorText}>{cardErrors.holder}</Text>}
                     </View>
-
                     <View style={styles.cardExtra}>
                       <View style={[styles.inputContainer, { width: '48%' }]}>
                         <Text style={styles.inputLabel}>Expiry Date</Text>
@@ -419,9 +501,8 @@ export default function PaymentScreen() {
                           keyboardType="numeric"
                           maxLength={5}
                         />
-                        {cardErrors.expiry ? <Text style={styles.errorText}>{cardErrors.expiry}</Text> : null}
+                        {cardErrors.expiry && <Text style={styles.errorText}>{cardErrors.expiry}</Text>}
                       </View>
-                      
                       <View style={[styles.inputContainer, { width: '48%' }]}>
                         <Text style={styles.inputLabel}>CVV</Text>
                         <TextInput
@@ -433,12 +514,11 @@ export default function PaymentScreen() {
                           maxLength={3}
                           secureTextEntry
                         />
-                        {cardErrors.cvv ? <Text style={styles.errorText}>{cardErrors.cvv}</Text> : null}
+                        {cardErrors.cvv && <Text style={styles.errorText}>{cardErrors.cvv}</Text>}
                       </View>
                     </View>
                   </View>
                 )}
-
                 {['gpay', 'phonepe', 'paytm'].includes(selectedMethod ?? '') && (
                   <View style={styles.upiDetails}>
                     <Text style={styles.detailsTitle}>UPI Details</Text>
@@ -452,14 +532,13 @@ export default function PaymentScreen() {
                         keyboardType="email-address"
                         autoCapitalize="none"
                       />
-                      {upiError ? <Text style={styles.errorText}>{upiError}</Text> : null}
+                      {upiError && <Text style={styles.errorText}>{upiError}</Text>}
                     </View>
                   </View>
                 )}
               </Animated.View>
             )}
 
-            {/* Security Message */}
             <View style={styles.securityMessage}>
               <Ionicons name="lock-closed" size={18} color="#64748B" />
               <Text style={styles.securityText}>
@@ -468,7 +547,6 @@ export default function PaymentScreen() {
             </View>
           </ScrollView>
 
-          {/* Pay Button - Fixed at bottom */}
           <View style={[styles.bottomContainer, keyboardVisible && { display: 'none' }]}>
             <TouchableOpacity
               style={[
@@ -500,7 +578,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
-    paddingBottom: 100, // Extra padding to avoid button overlap
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
@@ -551,6 +629,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#007AFF',
+  },
+  statusText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 10,
+    textAlign: 'center',
   },
   paymentOptions: {
     marginBottom: 20,

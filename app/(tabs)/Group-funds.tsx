@@ -10,9 +10,9 @@ import {
   Alert,
   SafeAreaView,
   StatusBar,
-  Image,
   ActivityIndicator,
   Dimensions,
+  Image,
 } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import QRCode from 'react-native-qrcode-svg';
@@ -53,34 +53,41 @@ const MicroinvestmentScreen: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'savings' | 'trips'>('savings');
 
-  // Helper function to generate UI Avatars URL
-  const getUiAvatar = (name: string) => {
-    const encodedName = encodeURIComponent(name);
-    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
+
+
+  const generateCustomAvatar = (name: string) => {
+  
+      const initials = name
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase())
+      .join('')
+      .slice(0, 2); // Limit to 2 initials
+
+    return { initials, backgroundColor: '#adb5bd' };
   };
 
   // Sample group trips data
   const groupTrips: GroupTrip[] = [
-    { 
-      destination: 'Goa Beach', 
-      cost: 5000, 
-      duration: '3 days', 
-      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=90&h=90&q=80', 
-      progress: 65 
+    {
+      destination: 'Goa Beach',
+      cost: 5000,
+      duration: '3 days',
+      image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=90&h=90&q=80',
+      progress: 65,
     },
-    { 
-      destination: 'Manali Hills', 
-      cost: 7000, 
-      duration: '5 days', 
-      image: 'https://plus.unsplash.com/premium_photo-1726313836345-3524772937fe?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D', 
-      progress: 42 
+    {
+      destination: 'Manali Hills',
+      cost: 7000,
+      duration: '5 days',
+      image: 'https://plus.unsplash.com/premium_photo-1726313836345-3524772937fe?q=80&w=2940&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      progress: 42,
     },
-    { 
-      destination: 'Rajasthan Safari', 
-      cost: 6000, 
-      duration: '4 days', 
-      image: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?ixlib=rb-4.0.3&auto=format&fit=crop&w=90&h=90&q=80', 
-      progress: 28 
+    {
+      destination: 'Rajasthan Safari',
+      cost: 6000,
+      duration: '4 days',
+      image: 'https://images.unsplash.com/photo-1524492412937-b28074a5d7da?ixlib=rb-4.0.3&auto=format&fit=crop&w=90&h=90&q=80',
+      progress: 28,
     },
   ];
 
@@ -138,31 +145,31 @@ const MicroinvestmentScreen: React.FC = () => {
   }, []);
 
   // Render individual member card
-  const renderMember = ({ item }: { item: Member }) => (
-    <Animatable.View animation="fadeIn" style={styles.memberCard}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => setSelectedMember(item.name)}
-      >
-        <Image 
-          source={{ uri: getUiAvatar(item.name) }} 
-          style={styles.memberAvatar} 
-          defaultSource={{ uri: 'https://via.placeholder.com/64' }} 
-        />
-        <Text style={styles.memberName}>{item.name}</Text>
-        <Text style={styles.memberSavings}>₹{item.savings.toLocaleString()}</Text>
-      </TouchableOpacity>
-    </Animatable.View>
-  );
+  const renderMember = ({ item }: { item: Member }) => {
+    const { initials, backgroundColor } = generateCustomAvatar(item.name);
+    return (
+      <Animatable.View animation="fadeIn" style={styles.memberCard}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => setSelectedMember(item.name)}
+        >
+          <View style={[styles.memberAvatar, { backgroundColor }]}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <Text style={styles.memberName}>{item.name}</Text>
+          <Text style={styles.memberSavings}>₹{item.savings.toLocaleString()}</Text>
+        </TouchableOpacity>
+      </Animatable.View>
+    );
+  };
 
   // Render individual trip item
   const renderTrip = ({ item }: { item: GroupTrip }) => (
     <Animatable.View animation="fadeInUp" style={styles.tripItem}>
-      <Image 
-        source={{ uri: item.image }} 
-        style={styles.tripImage} 
-        defaultSource={{ uri: 'https://via.placeholder.com/90' }} 
-        onError={(e) => console.log(`Failed to load image for ${item.destination}: ${e.nativeEvent.error}`)}
+      <Image
+        source={{ uri: item.image }}
+        style={styles.tripImage}
+        onError={(e: { nativeEvent: { error: string } }) => console.log(`Failed to load image for ${item.destination}: ${e.nativeEvent.error}`)}
       />
       <View style={styles.tripInfo}>
         <Text style={styles.tripDestination}>{item.destination}</Text>
@@ -322,10 +329,11 @@ const MicroinvestmentScreen: React.FC = () => {
           <Animatable.View animation="slideInUp" style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <View style={styles.modalTitleContainer}>
-                <Image 
-                  source={{ uri: selectedMember ? getUiAvatar(selectedMember) : '' }} 
-                  style={styles.modalMemberAvatar} 
-                />
+                {selectedMember && (
+                  <View style={[styles.memberAvatar, { backgroundColor: generateCustomAvatar(selectedMember).backgroundColor }]}>
+                    <Text style={styles.avatarText}>{generateCustomAvatar(selectedMember).initials}</Text>
+                  </View>
+                )}
                 <Text style={styles.modalTitle}>{selectedMember}</Text>
               </View>
               <TouchableOpacity onPress={() => setSelectedMember(null)} activeOpacity={0.7}>
@@ -482,8 +490,14 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    alignSelf: 'center',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
   },
   memberName: {
     fontSize: 16,
@@ -643,12 +657,6 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1e293b',
     marginLeft: 8,
-  },
-  modalMemberAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    marginRight: 12,
   },
   modalSubtitle: {
     fontSize: 15,

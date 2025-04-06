@@ -6,7 +6,6 @@ import {
   Text,
   TouchableOpacity,
   SafeAreaView,
-  Image,
   Alert,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -23,10 +22,8 @@ interface Member {
   paymentStatus?: 'pending' | 'paid';
   amountDue?: number;
   loanAmount?: number;
-  paymentRecipient?: string; // Who the payment is going to
+  paymentRecipient?: string;
 }
-
-
 
 type NavigationProps = {
   navigate: (screen: string, params?: any) => void;
@@ -39,10 +36,17 @@ export default function HomeScreen() {
   const [loading, setLoading] = useState<boolean>(true);
   const [showHero, setShowHero] = useState<boolean>(true);
 
-  const getUiAvatar = (name: string) => {
-    const encodedName = encodeURIComponent(name);
-    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
-  };
+
+const generateCustomAvatar = (name: string) => {
+  const initials = name
+  .split(' ')
+  .map(word => word.charAt(0).toUpperCase())
+  .join('')
+  .slice(0, 2);
+
+
+  return { initials,backgroundColor: '#dee2e6' };
+};
 
   useEffect(() => {
     const fetchLatestGroup = async () => {
@@ -75,7 +79,7 @@ export default function HomeScreen() {
               paymentStatus: 'pending' as const, 
               amountDue: 599, 
               loanAmount: 200,
-              paymentRecipient: 'Group Treasurer' // Example recipient
+              paymentRecipient: 'Group Treasurer'
             },
             { 
               name: data.member2, 
@@ -83,7 +87,7 @@ export default function HomeScreen() {
               paymentStatus: 'pending' as const, 
               amountDue: 599, 
               loanAmount: 0,
-              paymentRecipient: 'Group Admin' // Example recipient
+              paymentRecipient: 'Group Admin'
             },
             { 
               name: data.member3, 
@@ -125,7 +129,6 @@ export default function HomeScreen() {
         {
           text: 'Proceed to Payment',
           onPress: () => {
-            // console.log('PaymentScreen not implemented yet');
             navigation.navigate('PaymentScreen', {
               memberName: member.name,
               amount: member.amountDue,
@@ -145,7 +148,6 @@ export default function HomeScreen() {
     );
   };
 
-  // Handle loan reminder
   const handleRemindLoan = (member: Member) => {
     Alert.alert(
       `Remind ${member.name}`,
@@ -201,38 +203,38 @@ export default function HomeScreen() {
           ) : members.filter(m => m.paymentStatus === 'pending').length > 0 ? (
             members
               .filter(m => m.paymentStatus === 'pending')
-              .map((member, index) => (
-                <View key={index} style={styles.statusCard}>
-                  <View style={styles.statusCardContent}>
-                    <Image source={{ uri: getUiAvatar(member.name) }} style={styles.memberAvatar} />
-                    <View style={styles.statusDetails}>
-                      <Text style={styles.memberName}>{member.name}</Text>
-                      {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
-                      <View style={styles.paymentRecipientContainer}>
-                        <Ionicons name="arrow-forward" size={16} color="#64748B" />
-                        <Text style={styles.paymentRecipient}>To: {member.paymentRecipient}</Text>
+              .map((member, index) => {
+                const { initials, backgroundColor } = generateCustomAvatar(member.name);
+                return (
+                  <View key={index} style={styles.statusCard}>
+                    <View style={styles.statusCardContent}>
+                      <View style={[styles.memberAvatar, { backgroundColor }]}>
+                        <Text style={styles.avatarText}>{initials}</Text>
                       </View>
-                    </View>
-                    <View style={styles.paymentInfo}>
-                      <Text style={styles.paymentAmount}>₹{member.amountDue}</Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          { backgroundColor: '#F59E0B' },
-                        ]}
-                      >
-                        <Text style={styles.statusText}>Pending</Text>
+                      <View style={styles.statusDetails}>
+                        <Text style={styles.memberName}>{member.name}</Text>
+                        {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+                        <View style={styles.paymentRecipientContainer}>
+                          <Ionicons name="arrow-forward" size={16} color="#64748B" />
+                          <Text style={styles.paymentRecipient}>To: {member.paymentRecipient}</Text>
+                        </View>
                       </View>
-                      <TouchableOpacity
-                        style={styles.payButton}
-                        onPress={() => handlePayment(member)}
-                      >
-                        <Text style={styles.payButtonText}>Pay Now</Text>
-                      </TouchableOpacity>
+                      <View style={styles.paymentInfo}>
+                        <Text style={styles.paymentAmount}>₹{member.amountDue}</Text>
+                        <View style={[styles.statusBadge, { backgroundColor: '#F59E0B' }]}>
+                          <Text style={styles.statusText}>Pending</Text>
+                        </View>
+                        <TouchableOpacity
+                          style={styles.payButton}
+                          onPress={() => handlePayment(member)}
+                        >
+                          <Text style={styles.payButtonText}>Pay Now</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
-                </View>
-              ))
+                );
+              })
           ) : (
             <Text style={styles.noMembersText}>No pending payments</Text>
           )}
@@ -246,51 +248,62 @@ export default function HomeScreen() {
           ) : members.filter((m) => m.loanAmount && m.loanAmount > 0).length > 0 ? (
             members
               .filter((m) => m.loanAmount && m.loanAmount > 0)
-              .map((member, index) => (
-                <View key={index} style={styles.loanCard}>
-                  <View style={styles.loanCardContent}>
-                    <Image source={{ uri: getUiAvatar(member.name) }} style={styles.memberAvatar} />
-                    <View style={styles.loanDetails}>
-                      <Text style={styles.memberName}>{member.name}</Text>
-                      {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
-                      <View style={styles.loanDirectionContainer}>
-                        <Ionicons name="arrow-back" size={16} color="#D97706" />
-                        <Text style={styles.loanDirection}>Owes you</Text>
+              .map((member, index) => {
+                const { initials, backgroundColor } = generateCustomAvatar(member.name);
+                return (
+                  <View key={index} style={styles.loanCard}>
+                    <View style={styles.loanCardContent}>
+                      <View style={[styles.memberAvatar, { backgroundColor }]}>
+                        <Text style={styles.avatarText}>{initials}</Text>
+                      </View>
+                      <View style={styles.loanDetails}>
+                        <Text style={styles.memberName}>{member.name}</Text>
+                        {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+                        <View style={styles.loanDirectionContainer}>
+                          <Ionicons name="arrow-back" size={16} color="#D97706" />
+                          <Text style={styles.loanDirection}>Owes you</Text>
+                        </View>
+                      </View>
+                      <View style={styles.loanInfo}>
+                        <Text style={styles.loanAmount}>₹{member.loanAmount}</Text>
+                        <TouchableOpacity
+                          style={styles.remindButton}
+                          onPress={() => handleRemindLoan(member)}
+                        >
+                          <Text style={styles.remindButtonText}>Remind</Text>
+                        </TouchableOpacity>
                       </View>
                     </View>
-                    <View style={styles.loanInfo}>
-                      <Text style={styles.loanAmount}>₹{member.loanAmount}</Text>
-                      <TouchableOpacity
-                        style={styles.remindButton}
-                        onPress={() => handleRemindLoan(member)}
-                      >
-                        <Text style={styles.remindButtonText}>Remind</Text>
-                      </TouchableOpacity>
-                    </View>
                   </View>
-                </View>
-              ))
+                );
+              })
           ) : (
             <Text style={styles.noMembersText}>No loans given</Text>
           )}
         </View>
 
+        {/* Group Members Section */}
         <View style={styles.membersSection}>
           <Text style={styles.sectionTitle}>Group Members</Text>
           {loading ? (
             <Text style={styles.loadingText}>Loading members...</Text>
           ) : members.length > 0 ? (
-            members.map((member, index) => (
-              <View key={index} style={styles.memberCard}>
-                <View style={styles.memberCardContent}>
-                  <Image source={{ uri: getUiAvatar(member.name) }} style={styles.memberAvatar} />
-                  <View>
-                    <Text style={styles.memberName}>{member.name}</Text>
-                    {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+            members.map((member, index) => {
+              const { initials, backgroundColor } = generateCustomAvatar(member.name);
+              return (
+                <View key={index} style={styles.memberCard}>
+                  <View style={styles.memberCardContent}>
+                    <View style={[styles.memberAvatar, { backgroundColor }]}>
+                      <Text style={styles.avatarText}>{initials}</Text>
+                    </View>
+                    <View>
+                      <Text style={styles.memberName}>{member.name}</Text>
+                      {member.email && <Text style={styles.memberEmail}>{member.email}</Text>}
+                    </View>
                   </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           ) : (
             <Text style={styles.noMembersText}>No members found</Text>
           )}
@@ -405,7 +418,7 @@ const styles = StyleSheet.create({
   },
   loansSection: {
     padding: 25,
-    backgroundColor: '#FFF7E6', // Light yellow background for distinction
+    backgroundColor: '#FFF7E6',
   },
   loanCard: {
     backgroundColor: '#FFFFFF',
@@ -432,7 +445,7 @@ const styles = StyleSheet.create({
   loanAmount: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#D97706', // Amber for loans
+    color: '#D97706',
     marginBottom: 5,
   },
   remindButton: {
@@ -476,6 +489,13 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     marginRight: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
   },
   memberName: {
     fontSize: 16,

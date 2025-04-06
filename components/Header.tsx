@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Link } from 'expo-router';
 import { Users } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createClient } from "@supabase/supabase-js";
-import Icon from "react-native-vector-icons/Feather";
+import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://nrbndwnsdegkfexmmaak.supabase.co';
 const SUPABASE_PUBLIC_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yYm5kd25zZGVna2ZleG1tYWFrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc3NDU2NjAsImV4cCI6MjA1MzMyMTY2MH0.Ypit5O8aG9QuEiWyotZtjJ-ixErkHhN6zk-Yd9VKcwE';
@@ -22,10 +21,16 @@ export default function Header() {
   const [members, setMembers] = useState<GroupMember[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Function to generate UI Avatars URL
-  const getUiAvatar = (name: string) => {
-    const encodedName = encodeURIComponent(name);
-    return `https://ui-avatars.com/api/?name=${encodedName}&background=f0f0f0&color=1e293b&size=128&rounded=true&bold=true`;
+  const generateCustomAvatar = (name: string) => {
+    if (!name) return { initials: '', backgroundColor: '#d9d9d9' };
+
+    const initials = name
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase())
+      .join('')
+      .slice(0, 2); // Limit to 2 initials
+
+    return { initials, backgroundColor: '#d9d9d9' };
   };
 
   // Fetch group name and members from AsyncStorage and Supabase
@@ -44,11 +49,10 @@ export default function Header() {
         setGroupName(parsedGroupName);
         console.log('Group Name from AsyncStorage:', parsedGroupName);
 
-        // Fetch group details from Supabase
         const { data, error } = await supabase
-          .from("groups")
-          .select("member1, member1_email, member2, member2_email, member3, member3_email")
-          .eq("name", parsedGroupName)
+          .from('groups')
+          .select('member1, member1_email, member2, member2_email, member3, member3_email')
+          .eq('name', parsedGroupName)
           .single();
 
         if (error) {
@@ -62,7 +66,7 @@ export default function Header() {
             { name: data.member1 || '', email: data.member1_email || '' },
             { name: data.member2 || '', email: data.member2_email || '' },
             { name: data.member3 || '', email: data.member3_email || '' },
-          ].filter((member) => member.name);
+          ].filter(member => member.name);
 
           console.log('Processed Members:', groupMembers);
           setMembers(groupMembers);
@@ -103,14 +107,15 @@ export default function Header() {
         <Text style={styles.logoText}>C&S</Text>
         <Text style={styles.companyName}>(Connect&Share)</Text>
       </View>
-      
+
       {groupName ? (
         <View>
           <TouchableOpacity onPress={toggleMembers}>
-            <Text style={styles.groupName}>     <Users size={32} color="black" />
+            <Text style={styles.groupName}>
+              <Users size={32} color="black" />
             </Text>
           </TouchableOpacity>
-          
+
           {showMembers && (
             <View style={styles.membersContainer}>
               <Text style={styles.membersTitle}>Group Members</Text>
@@ -118,36 +123,34 @@ export default function Header() {
                 {loading ? (
                   <Text style={styles.loadingText}>Loading...</Text>
                 ) : members.length > 0 ? (
-                  members.map((member, index) => (
-                    <View key={index} style={styles.memberItem}>
-                      <Image 
-                        source={{ uri: getUiAvatar(member.name) }} 
-                        style={styles.memberAvatar} 
-                      />
-                      <View style={styles.memberInfo}>
-                        <Text style={styles.memberText}>
-                          {member.name}
-                        </Text>
-                        {member.email && (
-                          <Text style={styles.memberEmail}>
-                            {member.email}
-                          </Text>
-                        )}
+                  members.map((member, index) => {
+                    const { initials, backgroundColor } = generateCustomAvatar(member.name);
+                    return (
+                      <View key={index} style={styles.memberItem}>
+                        <View style={[styles.memberAvatar, { backgroundColor }]}>
+                          <Text style={styles.avatarText}>{initials}</Text>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <Text style={styles.memberText}>{member.name}</Text>
+                          {member.email && (
+                            <Text style={styles.memberEmail}>{member.email}</Text>
+                          )}
+                        </View>
                       </View>
-                    </View>
-                  ))
+                    );
+                  })
                 ) : (
                   <Text style={styles.noMembersText}>No members found</Text>
                 )}
               </ScrollView>
               <View style={styles.buttonContainer}>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.closeButton}
                   onPress={() => setShowMembers(false)}
                 >
                   <Text style={styles.closeButtonText}>Close</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={styles.logoutButton}
                   onPress={handleLogout}
                 >
@@ -217,7 +220,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 0,
     top: 70,
-    width: 250, // Increased width to accommodate avatar
+    width: 250,
     maxHeight: 300,
     backgroundColor: '#FFFFFF',
     borderRadius: 10,
@@ -250,6 +253,13 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b', // Same as UI Avatars default text color
   },
   memberInfo: {
     flex: 1,
@@ -293,7 +303,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   logoutButton: {
-    backgroundColor: '#EF4444', // Red for logout
+    backgroundColor: '#EF4444',
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 5,
