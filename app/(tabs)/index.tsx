@@ -45,7 +45,7 @@ const generateCustomAvatar = (name: string) => {
   .slice(0, 2);
 
 
-  return { initials,backgroundColor: '#dee2e6' };
+  return { initials,backgroundColor: 'white' };
 };
 
   useEffect(() => {
@@ -488,6 +488,11 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 1.2,  
     marginRight: 15,
     justifyContent: 'center',
     alignItems: 'center',

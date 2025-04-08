@@ -63,7 +63,7 @@ const MicroinvestmentScreen: React.FC = () => {
       .join('')
       .slice(0, 2); // Limit to 2 initials
 
-    return { initials, backgroundColor: '#adb5bd' };
+    return { initials, backgroundColor: 'white' };
   };
 
   // Sample group trips data
@@ -487,9 +487,14 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   memberAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 69,
+    height: 69,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.8,
+    shadowRadius: 1.2,  
+    borderRadius: 22,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -497,7 +502,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    color: 'black',
   },
   memberName: {
     fontSize: 16,
