@@ -14,12 +14,13 @@ import {
   Platform,
   ScrollView,
   Alert,
+  FlatListProps, // Added for typing AnimatedFlatList
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
 import { Ionicons } from "@expo/vector-icons";
 import { createClient } from "@supabase/supabase-js";
-import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from '../../config';
+import { SUPABASE_URL, SUPABASE_PUBLIC_KEY } from "../../config";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY);
@@ -81,8 +82,10 @@ export default function App() {
   const [showMemberPostsModal, setShowMemberPostsModal] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<FlatList>(null);
-  const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+  const flatListRef = useRef<FlatList<User>>(null); // Typed ref for FlatList<User>
+  const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.ComponentType<
+    FlatListProps<User> & { ref?: React.RefObject<FlatList<User>> }
+  >; // Typed AnimatedFlatList with ref support
 
   // Fetch data on component mount
   useEffect(() => {
@@ -98,22 +101,20 @@ export default function App() {
 
   const setupCurrentUser = async () => {
     try {
-      // Fetch group data from AsyncStorage
       const savedGroupData = await AsyncStorage.getItem("groupData");
-      let groupName = "Group"; // Default fallback if no group is found
-  
+      let groupName = "Group";
+
       if (savedGroupData) {
         const parsedGroup = JSON.parse(savedGroupData);
         const storedGroupName = typeof parsedGroup === "string" ? parsedGroup : parsedGroup.name;
-  
+
         if (storedGroupName) {
-          // Query Supabase to verify and fetch the group name
           const { data, error } = await supabase
             .from("groups")
             .select("name")
             .eq("name", storedGroupName)
             .single();
-  
+
           if (error) {
             console.error("Error fetching group name from Supabase:", error);
           } else if (data) {
@@ -121,7 +122,7 @@ export default function App() {
           }
         }
       }
-  
+
       setCurrentUser({
         id: 99,
         name: groupName,
@@ -134,7 +135,7 @@ export default function App() {
       console.error("Error setting up current user with group name:", error);
       setCurrentUser({
         id: 99,
-        name: "Group", // Fallback in case of error
+        name: "Group",
         avatar: "https://randomuser.me/api/portraits/women/44.jpg",
         posts: [],
         followers: 231,
@@ -147,19 +148,16 @@ export default function App() {
     try {
       if (pageNum === 1) setLoading(true);
       else setIsFetchingMore(true);
-  
-      // Fetch users
+
       const res = await fetch(`https://jsonplaceholder.typicode.com/users?_page=${pageNum}&_limit=5`);
       const usersData = await res.json();
-  
-      // Fetch posts
+
       const postsRes = await fetch("https://jsonplaceholder.typicode.com/posts");
       const postsData = await postsRes.json();
-  
-      // Fetch comments
+
       const commentsRes = await fetch("https://jsonplaceholder.typicode.com/comments");
       const commentsData = await commentsRes.json();
-  
+
       const combinedData = usersData.map((user: any, index: number) => {
         const userPosts = postsData
           .filter((post: Post) => post.userId === user.id)
@@ -173,7 +171,7 @@ export default function App() {
               .slice(0, Math.floor(Math.random() * 5) + 1),
             image: Math.random() > 0.3 ? `https://picsum.photos/500/300?random=${post.id}` : undefined,
           }));
-  
+
         return {
           ...user,
           avatar: `https://randomuser.me/api/portraits/men/${user.id + (pageNum - 1) * 5}.jpg`,
@@ -182,12 +180,12 @@ export default function App() {
           following: Math.floor(Math.random() * 500) + 50,
         } as User;
       });
-  
+
       if (combinedData.length === 0) {
         setHasMore(false);
         return;
       }
-  
+
       setUsers((prevUsers) => (pageNum === 1 ? combinedData : [...prevUsers, ...combinedData]));
       setPage(pageNum);
     } catch (error) {
@@ -198,41 +196,40 @@ export default function App() {
       setRefreshing(false);
     }
   };
-  
 
   const fetchGroupMembers = async () => {
     try {
       const savedGroupData = await AsyncStorage.getItem("groupData");
-  
+
       if (!savedGroupData) {
         console.warn("No group data found in AsyncStorage.");
         setGroupMembers([]);
         return;
       }
-  
+
       const parsedGroup = JSON.parse(savedGroupData);
-      const groupName = typeof parsedGroup === 'string' ? parsedGroup : parsedGroup.name;
-  
+      const groupName = typeof parsedGroup === "string" ? parsedGroup : parsedGroup.name;
+
       if (!groupName) {
         console.warn("Group name missing in parsed group data:", parsedGroup);
         setGroupMembers([]);
         return;
       }
-  
+
       const { data, error } = await supabase
         .from("groups")
         .select("member1, member1_email, member2, member2_email, member3, member3_email")
         .eq("name", groupName)
         .single();
-  
+
       if (error) throw error;
-  
+
       if (!data) {
         console.warn("No group found for name:", groupName);
         setGroupMembers([]);
         return;
       }
-  
+
       const groupMembers: GroupMember[] = [
         {
           name: data.member1 || "",
@@ -253,7 +250,7 @@ export default function App() {
           postsCount: Math.floor(Math.random() * 20) + 1,
         },
       ].filter((member) => member.name?.trim().length > 0);
-  
+
       setGroupMembers(groupMembers);
     } catch (error) {
       console.error("Error fetching group members from Supabase:", error);
@@ -261,14 +258,13 @@ export default function App() {
       setGroupMembers([]);
     }
   };
-  
 
   const fetchMemberPosts = async (memberEmail: string) => {
     try {
       const postsRes = await fetch("https://jsonplaceholder.typicode.com/posts");
       const postsData = await postsRes.json();
       const memberPosts = postsData
-        .slice(0, 5) // Limit to 5 posts for demo
+        .slice(0, 5)
         .map((post: any) => ({
           ...post,
           likes: Math.floor(Math.random() * 200) + 1,
@@ -322,15 +318,15 @@ export default function App() {
 
   const addComment = (userId: number, postId: number, comment: string) => {
     if (!comment.trim()) return;
-  
+
     const newComment: Comment = {
       id: Date.now(),
       postId: postId,
-      name: currentUser?.name || "Group", // Changed fallback to "Group" or keep it dynamic
-      email: "group@example.com", // Updated email for consistency
+      name: currentUser?.name || "Group",
+      email: "group@example.com",
       body: comment,
     };
-  
+
     setUsers(
       users.map((user) => {
         if (user.id === userId) {
@@ -345,7 +341,7 @@ export default function App() {
         return user;
       })
     );
-  
+
     setCommentText("");
     if (selectedPost && selectedPost.id === postId) {
       setSelectedPost({ ...selectedPost, comments: [...selectedPost.comments, newComment] });
@@ -445,7 +441,6 @@ export default function App() {
           <Ionicons name="share-social-outline" size={22} color="#64748b" />
         </TouchableOpacity>
       </View>
-      {/* Moved comment input up here */}
       <View style={styles.addCommentContainer}>
         <Image source={{ uri: currentUser?.avatar }} style={styles.commentAvatar} />
         <TextInput
@@ -552,12 +547,12 @@ export default function App() {
             </Text>
           </View>
           <View style={styles.groupSection}>
-            <Text style={styles.groupTitle}>Group Members</Text> {/* Removed "Your" since it's now the group name */}
+            <Text style={styles.groupTitle}>Group Members</Text>
             {groupMembers.length > 0 ? (
               <FlatList
                 data={groupMembers}
                 renderItem={renderGroupMember}
-                keyExtractor={(item) => item.email || item.name}
+                keyExtractor={(item, index) => `${item.email}-${index}`} // Updated to ensure unique keys
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.groupMembersList}
@@ -567,7 +562,7 @@ export default function App() {
             )}
           </View>
           <View style={styles.userPostsSection}>
-            <Text style={styles.postsTitle}>Posts</Text> {/* Removed "Your" */}
+            <Text style={styles.postsTitle}>Posts</Text>
             {currentUser.posts.length > 0 ? (
               currentUser.posts.map((post) => renderPost({ item: post, userId: currentUser.id }))
             ) : (
@@ -731,7 +726,7 @@ export default function App() {
                   <Text style={styles.statText}>{selectedPost.comments.length} comments</Text>
                 </View>
               </View>
-              <View style={styles.postDetailActions}>
+              <View style={styles.postizzDetailActions}>
                 <TouchableOpacity
                   style={styles.detailActionButton}
                   onPress={() => toggleLike(selectedPost.userId, selectedPost.id)}
@@ -1123,7 +1118,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: "#f1f5f9",
     paddingTop: 12,
-    marginBottom: 8, // Add this to control spacing below
+    marginBottom: 8,
   },
   commentAvatar: {
     width: 32,
@@ -1330,7 +1325,7 @@ const styles = StyleSheet.create({
     color: "#64748b",
     marginLeft: 4,
   },
-  postDetailActions: {
+  postizzDetailActions: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderTopWidth: 1,
