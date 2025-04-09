@@ -8,7 +8,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.satyamdev.candsconnectandshare"
     },
     "web": {
       "bundler": "metro",
@@ -30,6 +31,9 @@
       }
     },
     "owner": "satyamdev",
-    "slug": "candsconnectandshare"
+    "slug": "candsconnectandshare",
+    "android": {
+      "package": "com.satyamdev.candsconnectandshare"
+    }
   }
 }
