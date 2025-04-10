@@ -14,7 +14,7 @@ import {
   Platform,
   ScrollView,
   Alert,
-  FlatListProps, // Added for typing AnimatedFlatList
+  FlatListProps,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Animatable from "react-native-animatable";
@@ -62,7 +62,6 @@ interface GroupMember {
 }
 
 export default function App() {
-  // State management
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -82,12 +81,11 @@ export default function App() {
   const [showMemberPostsModal, setShowMemberPostsModal] = useState(false);
 
   const scrollY = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<FlatList<User>>(null); // Typed ref for FlatList<User>
+  const flatListRef = useRef<FlatList<User>>(null);
   const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.ComponentType<
     FlatListProps<User> & { ref?: React.RefObject<FlatList<User>> }
-  >; // Typed AnimatedFlatList with ref support
+  >;
 
-  // Fetch data on component mount
   useEffect(() => {
     fetchUsers(1);
     setupCurrentUser();
@@ -397,7 +395,6 @@ export default function App() {
     setShowPostDetail(true);
   };
 
-  // Render components
   const renderComment = ({ item }: { item: Comment }) => (
     <View style={styles.commentItem}>
       <Text style={styles.commentAuthor}>{item.name}</Text>
@@ -410,7 +407,7 @@ export default function App() {
       <View style={styles.postHeader}>
         <View style={styles.postAuthorContainer}>
           <Image source={{ uri: users.find((u) => u.id === userId)?.avatar }} style={styles.postAvatar} />
-          <Text style={styles.postAuthor}>{users.find((u) => u.id === userId)?.name}</Text>
+          <Text style={styles.postAuthor}>{users.find((u) => u.id === userId)?.name || "Unknown"}</Text>
         </View>
         <TouchableOpacity>
           <Ionicons name="ellipsis-vertical" size={20} color="#64748b" />
@@ -462,7 +459,7 @@ export default function App() {
         <View style={styles.commentsPreview}>
           <Text style={styles.commentsHeader}>Recent Comments ({item.comments.length})</Text>
           {item.comments.slice(0, 2).map((comment) => (
-            <View key={comment.id} style={styles.commentItem}>
+            <View key={comment.id.toString()} style={styles.commentItem}>
               <Text style={styles.commentAuthor}>{comment.name}</Text>
               <Text style={styles.commentBody} numberOfLines={1}>{comment.body}</Text>
             </View>
@@ -495,7 +492,7 @@ export default function App() {
         <View style={styles.userPostsPreview}>
           {item.posts.slice(0, 3).map((post, index) => (
             <TouchableOpacity
-              key={post.id}
+              key={post.id.toString()}
               style={[styles.postPreview, index === 2 && { marginRight: 0 }]}
               onPress={() => openPostDetail(post)}
             >
@@ -514,10 +511,7 @@ export default function App() {
   );
 
   const renderGroupMember = ({ item }: { item: GroupMember }) => (
-    <TouchableOpacity
-      style={styles.groupMemberCard}
-      onPress={() => fetchMemberPosts(item.email)}
-    >
+    <TouchableOpacity style={styles.groupMemberCard} onPress={() => fetchMemberPosts(item.email)}>
       <Animatable.View animation="fadeIn" duration={500}>
         <Image source={{ uri: item.avatar }} style={styles.groupMemberAvatar} />
         <View style={styles.groupMemberInfo}>
@@ -532,7 +526,13 @@ export default function App() {
     if (activeTab === "people") {
       return renderUserCard({ item });
     }
-    return <View>{item.posts.map((post) => renderPost({ item: post, userId: item.id }))}</View>;
+    return (
+      <View>
+        {item.posts.map((post) => (
+          <View key={post.id.toString()}>{renderPost({ item: post, userId: item.id })}</View>
+        ))}
+      </View>
+    );
   };
 
   const renderProfileSection = () => (
@@ -552,7 +552,7 @@ export default function App() {
               <FlatList
                 data={groupMembers}
                 renderItem={renderGroupMember}
-                keyExtractor={(item, index) => `${item.email}-${index}`} // Updated to ensure unique keys
+                keyExtractor={(item, index) => `${item.email || "member"}-${index}`}
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.groupMembersList}
@@ -564,7 +564,9 @@ export default function App() {
           <View style={styles.userPostsSection}>
             <Text style={styles.postsTitle}>Posts</Text>
             {currentUser.posts.length > 0 ? (
-              currentUser.posts.map((post) => renderPost({ item: post, userId: currentUser.id }))
+              currentUser.posts.map((post) => (
+                <View key={post.id.toString()}>{renderPost({ item: post, userId: currentUser.id })}</View>
+              ))
             ) : (
               <Text style={styles.noPostsText}>No posts yet.</Text>
             )}
@@ -644,7 +646,7 @@ export default function App() {
           </View>
           <View style={styles.userInfoRow}>
             <Image source={{ uri: currentUser?.avatar }} style={styles.currentUserAvatar} />
-            <Text style={styles.currentUserName}>{currentUser?.name}</Text>
+            <Text style={styles.currentUserName}>{currentUser?.name || "Unknown"}</Text>
           </View>
           <ScrollView style={styles.createPostForm}>
             <TextInput
@@ -706,7 +708,7 @@ export default function App() {
                 />
                 <View>
                   <Text style={styles.postDetailAuthor}>
-                    {users.find((u) => u.id === selectedPost.userId)?.name}
+                    {users.find((u) => u.id === selectedPost.userId)?.name || "Unknown"}
                   </Text>
                   <Text style={styles.postDetailTime}>3 hours ago</Text>
                 </View>
@@ -726,7 +728,7 @@ export default function App() {
                   <Text style={styles.statText}>{selectedPost.comments.length} comments</Text>
                 </View>
               </View>
-              <View style={styles.postizzDetailActions}>
+              <View style={styles.postDetailActions}>
                 <TouchableOpacity
                   style={styles.detailActionButton}
                   onPress={() => toggleLike(selectedPost.userId, selectedPost.id)}
@@ -750,7 +752,7 @@ export default function App() {
               <View style={styles.commentsSection}>
                 <Text style={styles.commentsSectionTitle}>Comments ({selectedPost.comments.length})</Text>
                 {selectedPost.comments.map((comment) => (
-                  <View key={comment.id} style={styles.commentItemDetailed}>
+                  <View key={comment.id.toString()} style={styles.commentItemDetailed}>
                     <Image
                       source={{ uri: "https://randomuser.me/api/portraits/women/32.jpg" }}
                       style={styles.commentAvatarDetailed}
@@ -859,7 +861,7 @@ export default function App() {
                 <Text style={styles.storyText}>Your Story</Text>
               </TouchableOpacity>
               {users.slice(0, 7).map((user) => (
-                <TouchableOpacity key={user.id} style={styles.storyItem}>
+                <TouchableOpacity key={user.id.toString()} style={styles.storyItem}>
                   <View style={styles.storyRing}>
                     <Image source={{ uri: user.avatar }} style={styles.storyAvatar} />
                   </View>
@@ -873,7 +875,7 @@ export default function App() {
           <AnimatedFlatList
             ref={flatListRef}
             data={users}
-            renderItem={({ item }) => renderUserFeedItem({ item })}
+            renderItem={renderUserFeedItem}
             keyExtractor={(item: User) => item.id.toString()}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
@@ -1160,7 +1162,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 6,
     elevation: 5,
-  },
+  },
   modalContainer: {
     flex: 1,
     backgroundColor: "rgba(15, 23, 42, 0.5)",
@@ -1325,7 +1327,7 @@ const styles = StyleSheet.create({
     color: "#64748b",
     marginLeft: 4,
   },
-  postizzDetailActions: {
+  postDetailActions: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderTopWidth: 1,
